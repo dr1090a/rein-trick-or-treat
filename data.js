@@ -82,7 +82,7 @@ window.GAME_DATA = {
     { id: "mandrake",            name: "曼德拉草",         zone: "loose", element: "木", taste: [1, 1, 2], tags: ["witch"], rule: "instadeath", lore: "", verdict: "", sprite: "jar.png" },
     { id: "macbeth_pack",        name: "馬克白香料包",     zone: "loose", element: "火", taste: [1, 2, 1], tags: ["witch", "dog_tongue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     { id: "unicorn_horn_powder", name: "獨角兔的角粉",     zone: "loose", element: "金", taste: [2, 1, 1], tags: [], rule: "neutralize_once", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "amabie_scale",        name: "アマビエ的鱗片",   zone: "loose", element: "水", taste: [2, 1, 1], tags: ["yokai"], rule: "immune_once", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "amabie_scale",        name: "阿瑪比埃的鱗片",   zone: "loose", element: "水", taste: [2, 1, 1], tags: ["yokai"], rule: "immune_once", lore: "", verdict: "", sprite: "jar.png" },
     { id: "mermaid_flesh",       name: "人魚肉",           zone: "loose", element: "水", taste: [2, 1, 3], tags: ["longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     { id: "lethe_water",         name: "忘川水",           zone: "loose", element: "水", taste: [0, 0, 1], tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     { id: "jade_rabbit_elixir",  name: "玉兔搗的藥",       zone: "loose", element: "水", taste: [2, 2, 2], tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
@@ -90,7 +90,7 @@ window.GAME_DATA = {
     { id: "dragon_blood",        name: "龍血",             zone: "loose", element: "火", taste: [3, 1, 2], tags: ["liquid", "highvalue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     { id: "taisui",              name: "太歲",             zone: "loose", element: "土", taste: [1, 1, 2], tags: ["highvalue", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     // 吉凶待月月裁定 → 定案後把 rule 換成 null（吉）或 discount / instadeath（凶）
-    { id: "kesaran_pasaran",     name: "ケサランパサラン", zone: "loose", element: "金", taste: [2, 0, 0], tags: ["yokai"], rule: "pending", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "kesaran_pasaran",     name: "幸運毛球",         zone: "loose", element: "金", taste: [2, 0, 0], tags: ["yokai"], rule: "pending", lore: "", verdict: "", sprite: "jar.png" },
     { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", element: "金", taste: [0, 0, 0], tags: ["sound", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
     { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", element: "水", taste: [2, 2, 1], tags: ["liquid", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     // 有妖怪履歷的正常食材：zone 放 loose 進魔幻池
@@ -104,7 +104,7 @@ window.GAME_DATA = {
     { id: "pumpkin_bowl",    name: "南瓜盅",         rule: "none", baseScore: 0, params: { skinChance: 0.01, skinName: "蕪菁盅" }, lore: "", verdict: "" },
     // heartless：給分不給心，零韻死魚眼進食
     { id: "pizza",           name: "披薩",           rule: "pineapple_legal", baseScore: 0, params: { heartless: true }, lore: "", verdict: "" },
-    { id: "okiku_plate",     name: "お菊的盤子",     rule: "vanish_one", baseScore: 8, lore: "", verdict: "" },
+    { id: "okiku_plate",     name: "阿菊的盤子",     rule: "vanish_one", baseScore: 8, lore: "", verdict: "" },
     { id: "pandora_pithos",  name: "潘朵拉的甕",     rule: "keep_one_on_fail", baseScore: 0, lore: "", verdict: "" },
     { id: "kappa_plate",     name: "河童的頭皿",     rule: "need_liquid", baseScore: 0, params: { penaltyPerTurn: 2 }, lore: "", verdict: "" },
     { id: "treasure_bowl",   name: "聚寶盆",         rule: "duplicate_one", baseScore: 0, lore: "", verdict: "" },

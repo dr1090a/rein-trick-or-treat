@@ -428,6 +428,9 @@
       hint.append(`占 ${shape.length} 格`, shapeMini(shape), "　",
         !fitsNow ? "這個方向放不下，旋轉看看。" : busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯放哪？還是丟掉？` : "放到哪裡？（點格子或按 1–9）");
     }
+    const lore = $("#trayLore");
+    lore.textContent = S.hand ? S.hand.ing.lore : "";
+    lore.hidden = !lore.textContent;
 
     // 分數、要求與色香味
     const est = estimate();
@@ -1038,7 +1041,7 @@
     const items = liveItems().filter(x => !x.dup).sort((a, b) => itemPoints(b) - itemPoints(a));
     const a = items[0], b = items[1];
     let n = a ? (b ? `${displayName(a)}佐${displayName(b)}` : displayName(a)) : "空氣";
-    n += `・${S.contName}仕立`;
+    n += `・${S.contName}盛裝`;
     if (L.type === "flip") n = `被掀翻的${n}`;
     else if (L.fatal) n = `來不及上桌的${n}`;
     else if (L.grade === "legend") n = `傳說的${n}`;
@@ -1051,12 +1054,9 @@
     const serial = "No. " + String(Math.floor(1000 + Math.random() * 9000)) + "-" + (now.getMonth() + 1) + now.getDate();
     const date = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}`;
 
-    const notes = [];
     const row = (x, p, off, tag) => {
-      let sup = null;
-      if (x.ing.lore && notes.length < 4 && !notes.some(n => n.id === x.ing.id)) { notes.push({ id: x.ing.id, name: x.ing.name, lore: x.ing.lore }); sup = notes.length; }
       const name = displayName(x) + (x.juiced ? "汁" : "") + (x.fake ? "（贗品）" : "") + (x.dup ? "（複製）" : "") + (tag || "");
-      return h("div", { class: "c-row" + (off ? " off" : "") }, h("span", { class: "n" }, h("span", { class: "rk" }, x.rar.id), name, sup ? h("sup", {}, sup) : null), h("span", { class: "p" }, p));
+      return h("div", { class: "c-row" + (off ? " off" : "") }, h("span", { class: "n" }, h("span", { class: "rk" }, x.rar.id), name), h("span", { class: "p" }, p));
     };
     const rows = [];
     allItems().sort((a, b) => a.cells[0] - b.cells[0]).forEach(x => {
@@ -1077,8 +1077,6 @@
     }
     const listCls = "c-list" + (rows.length > 9 ? " two" : "");
     const shown = rows.length > 24 ? rows.slice(0, 23).concat(h("div", { class: "c-row extra" }, h("span", { class: "n" }, `⋯⋯另有 ${rows.length - 23} 項`))) : rows;
-
-    if (S.container.lore && notes.length < 4) notes.push({ name: S.contName, lore: S.container.lore });
 
     const taste = L.fatal ? null : h("div", { class: "c-taste" },
       L.sc.axes.map((v, i) => h("span", {}, AXES[i] + " ", h("span", { class: "mx" }, v))),
@@ -1102,8 +1100,7 @@
           h("div", { class: "c-verdict-l" }, "鑑定師判詞"),
           h("div", { class: "c-verdict" }, "「" + (L.lines[0] || "") + "」", L.lines[1] ? h("span", { class: "sub" }, L.lines[1]) : null),
           L.trick ? h("div", { class: "c-trick" }, h("b", {}, `TRICK #${L.trick.id}`), "　" + (L.trick.text || "")) : null,
-          L.chips.length ? h("div", { class: "c-chips" }, L.chips.map(c => h("span", { class: "c-chip" }, c))) : null,
-          notes.length ? h("div", { class: "c-notes" }, notes.map((n, i) => h("p", {}, `${n.id ? i + 1 + "　" : "※ "}${n.name}：${n.lore}`))) : null),
+          L.chips.length ? h("div", { class: "c-chips" }, L.chips.map(c => h("span", { class: "c-chip" }, c))) : null),
         h("div", { class: "c-right" },
           h("div", { class: "c-stamp" + (L.stampCls ? " " + L.stampCls : "") + (L.stampZh ? " zh" : "") }, L.stamp),
           h("img", { class: "c-portrait", src: `assets/rein/${FACES.includes(L.face) ? L.face : "idle"}.webp`, alt: "" }))),
