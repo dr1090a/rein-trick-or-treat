@@ -18,6 +18,7 @@
   const RAR_ORDER = RARITIES.map(r => r.id);
   const AXES = ["色", "香", "味"];
   const ZONES = { normal: "正常食材", mine: "地雷", setA: "套裝・葛萊普尼爾", setB: "套裝・竹取五難題", setC: "套裝・飛行軟膏", loose: "散裝魔幻", special: "特殊罐" };
+  const ING_BY_ID = Object.fromEntries(D.ingredients.map(i => [i.id, i]));
 
   // 五行：GEN[a] = a 所生；KE[a] = a 所剋
   const GEN = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
@@ -50,6 +51,16 @@
     if (ing.tags.includes("dog_tongue")) parts.push("裡面好像有犬之舌。");
     if (ing.tags.includes("inedible")) parts.push(`不能吃：每格味 −${C.inediblePenalty}。`);
     return parts.join("");
+  }
+
+  // 組合條件說明（詳情視窗用）：這樣材料參與的每個組合技一行
+  function comboLines(ing) {
+    return COMBOS.filter(c => c.requires.includes(ing.id)).map(c => {
+      const others = c.requires.filter(id => id !== ing.id).map(id => (ING_BY_ID[id] || { name: id }).name);
+      const cond = c.requires.length >= 5 ? "同盤" : "相鄰連成一塊";
+      const extra = [c.requireGenuine ? "全須真品" : "", c.bonus ? `+${c.bonus} 分` : ""].filter(Boolean).join("，");
+      return `與「${others.join("」「")}」${cond} → ${c.result}${extra ? `（${extra}）` : ""}`;
+    });
   }
 
   // data.js 的 verdict / text 還沒填時的備用台詞；月月填了就會蓋過去
@@ -149,11 +160,15 @@
     for (const i of x.cells) for (const n of neighbors(i)) { const y = S.grid[n]; if (live(y) && y !== x) out.add(y); }
     return [...out];
   }
-  // 組合技：所需材料在盤上相鄰（上下左右）連成一塊才成立
+  // 組合技：2–3 件的小組合要在盤上相鄰（上下左右）連成一塊；5 件以上的大套裝同盤即可
   function comboDone(c) {
     const need = new Set(c.requires);
     const cells = [];
     S.grid.forEach((x, i) => { if (live(x) && need.has(x.ing.id) && !(c.requireGenuine && x.fake && x.revealed)) cells.push(i); });
+    if (c.requires.length >= 5) {
+      const ids = new Set(cells.map(i => S.grid[i].ing.id));
+      return c.requires.every(id => ids.has(id));
+    }
     const seen = new Set();
     for (const start of cells) {
       if (seen.has(start)) continue;
@@ -469,6 +484,8 @@
         h("span", {}, inHand ? "預估 " : "小計 ", h("b", {}, hiddenStars(x) || (x.ing.rule === "authenticity" && !x.revealed) ? "？" : pts(itemPoints(x))))),
       f.length ? h("div", { class: "info-meta" }, f.map(([k, v]) => h("span", {}, k + " ", h("b", {}, fmtMult(v))))) : null,
       eff ? h("p", { class: "info-effect" }, h("b", {}, "效果　"), eff) : null,
+      h("p", { class: "info-effect" }, h("b", {}, "分區　"), ZONES[x.ing.zone] || x.ing.zone),
+      ...comboLines(x.ing).map(t => h("p", { class: "info-effect" }, h("b", {}, "組合　"), t)),
       h("p", { class: "info-effect" }, h("b", {}, "五行　"), wuxingLine(elementOf(x))),
       x.ing.lore ? h("p", { class: "info-lore" }, x.ing.lore) : null].filter(Boolean));
     $("#infoModal").hidden = false;

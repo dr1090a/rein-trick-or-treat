@@ -29,7 +29,7 @@
 // 容器 rule   none / pineapple_legal / vanish_one / keep_one_on_fail / need_liquid
 //             duplicate_one / liquid_only / witch_bonus / flip_half
 // combo effect cancel_instadeath / ending / float / collection；bonus = 成立時加的分數
-//             材料要在盤上相鄰（上下左右）連成一塊才成立
+//             2–3 件組合：材料要在盤上相鄰（上下左右）連成一塊；5 件以上套裝：同盤即可
 // event rule  nibble 零韻偷吃一格 / swap 兩格換位 / price_mult 一樣材料分數 ×params.mult
 // ────────────────────────────────────────────────
 
