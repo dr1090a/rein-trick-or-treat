@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>餵食零韻・萬聖節</title>
+<meta name="description" content="在零韻的圖書館餐廳抽食材組料理，達標得 Treat，未達標吃 Trick，鳳梨落盤直接掀盤。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a2332'/%3E%3Cpath d='M16 9c-6 0-9 4-9 9s4 8 9 8 9-3 9-8-3-9-9-9z' fill='none' stroke='%23c9a961' stroke-width='2'/%3E%3Cpath d='M16 9V5' stroke='%23c9a961' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <span class="brand-en">Rein's Library Diner · Halloween</span>
+      <h1>餵食零韻・Trick or Treat</h1>
+    </div>
+    <div class="meters">
+      <div class="meter" title="血條：掀盤或即死會扣一格，歸零零韻暴走"><span class="meter-label">血條</span><span id="hp"></span></div>
+      <div class="meter" title="好感度：每次 Treat 累積"><span class="meter-label">好感</span><span id="aff"></span></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage" id="stage">
+      <div class="shelf" aria-hidden="true"></div>
+      <div class="bubble" id="bubble" aria-live="polite"></div>
+      <div class="rein-wrap" id="reinWrap"><img id="rein" src="assets/rein/idle.webp" alt="零韻"></div>
+      <div class="fx" id="fx" aria-hidden="true"></div>
+    </section>
+
+    <section class="panel" id="panel">
+      <!-- 開場 -->
+      <div class="screen" id="screen-title">
+        <p class="eyebrow">Halloween Night · 圖書館餐廳開張</p>
+        <h2>今晚，零韻要吃什麼？</h2>
+        <p class="lead">從食材櫃抽材料放上盤子——抽到什麼都得上盤。覺得夠了就收手送餐：估價過線，零韻給你 <b>Treat</b>；不夠，就換她 <b>Trick</b>。<br>鳳梨落盤，直接掀盤。</p>
+        <button class="btn primary" id="btnStart">開始點餐</button>
+        <details class="rules">
+          <summary>規則與小提示</summary>
+          <ul>
+            <li>每局隨機端出三個容器讓你挑，每種容器自帶一條規則。</li>
+            <li>盤子只有九格。抽到什麼都得上盤，你只能決定放哪一格——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>中央是主菜位，估價 ×2。組合技的材料要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
+            <li>每放一格，偶爾會發生意外。</li>
+            <li>估價達到 <span class="passline"></span> 就是 Treat。</li>
+            <li>掀盤或即死扣一格血，血條歸零⋯⋯後果自負。</li>
+            <li>有些材料湊在一起會發生事情。典故就是提示。</li>
+            <li>快捷鍵：空白鍵抽一樣、1–9 放到第幾格、Enter 送餐、T 切換透明背景（OBS 用）。</li>
+          </ul>
+        </details>
+        <div class="album" id="album"></div>
+      </div>
+
+      <!-- 選容器 -->
+      <div class="screen" id="screen-container" hidden>
+        <p class="eyebrow">Step 1 · 今晚端出來的容器</p>
+        <h2>要用什麼盛？</h2>
+        <div class="containers" id="containers"></div>
+      </div>
+
+      <!-- 抽材料 -->
+      <div class="screen" id="screen-play" hidden>
+        <div class="plate-head">
+          <div>
+            <p class="eyebrow" id="contRule"></p>
+            <h2 id="contName"></h2>
+          </div>
+          <div class="estimate">
+            <span class="est-label">目前估價</span>
+            <span class="est-value" id="estimate">NT$0</span>
+            <span class="est-line">達標 <span class="passline"></span></span>
+          </div>
+        </div>
+        <div class="board">
+          <div class="plate" id="plate"></div>
+          <div class="side">
+            <div class="tray" id="tray">
+              <p class="tray-label">手上的材料</p>
+              <div class="tray-slot" id="traySlot"><span class="tray-empty">先抽一樣</span></div>
+              <p class="tray-hint" id="trayHint"></p>
+              <button class="btn small" id="btnDiscard" hidden>丟掉</button>
+            </div>
+            <div class="combo-line" id="comboLine"></div>
+          </div>
+        </div>
+        <p class="log" id="log"></p>
+        <div class="actions" id="playActions">
+          <button class="btn primary" id="btnDraw">再抽一樣</button>
+          <button class="btn" id="btnServe">收手送餐</button>
+        </div>
+      </div>
+
+      <!-- 結算 -->
+      <div class="screen" id="screen-result" hidden>
+        <div class="stamp-big" id="resStamp"></div>
+        <p class="res-score" id="resScore"></p>
+        <blockquote class="res-verdict" id="resVerdict"></blockquote>
+        <div class="trick-box" id="trickBox" hidden></div>
+        <div class="chips" id="resChips"></div>
+        <div class="actions">
+          <button class="btn primary" id="btnCard">看鑑定證書</button>
+          <button class="btn" id="btnAgain">再來一盤</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>月上零韻 · 2026 Halloween</span>
+    <button class="linkbtn" id="btnObs">透明背景</button>
+  </footer>
+</div>
+
+<!-- 證書彈窗：顯示的是 html2canvas 產生的 PNG -->
+<div class="modal" id="cardModal" hidden>
+  <div class="modal-box">
+    <div class="modal-img" id="cardImgWrap"><p class="loading">證書製作中⋯⋯</p></div>
+    <div class="actions">
+      <a class="btn primary" id="btnSave" download>存圖</a>
+      <button class="btn" id="btnClose">關閉</button>
+    </div>
+    <p class="hint">手機可長按圖片儲存</p>
+  </div>
+</div>
+
+<!-- 截圖用的證書本體，放在畫面外 -->
+<div class="cert-holder" aria-hidden="true">
+  <div class="cert" id="cert"></div>
+</div>
+
+<div class="overlay" id="overlay" aria-hidden="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
