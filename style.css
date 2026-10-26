@@ -211,6 +211,32 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 .dish .mult { grid-column: 1 / -1; border-top: 1px solid var(--gold-line); margin-top: 4px; padding-top: 4px; display: flex; justify-content: space-between; color: var(--cream-dim); }
 .dish .mult b { color: var(--gold); font-family: var(--serif-en); font-size: 15px; }
 
+/* 五行：右上角屬性字，左上角生剋標記 */
+.el { position: absolute; top: 3px; right: 5px; font-size: 11px; color: var(--gold-dim); font-weight: 600; pointer-events: none; }
+.rel { position: absolute; top: 3px; left: 5px; font-size: 10px; letter-spacing: .02em; pointer-events: none; display: flex; gap: 2px; }
+.rel .g { color: var(--gold); }
+.rel .k { color: #e09a88; }
+.tray-slot .tok { position: relative; }
+.req { font-size: 12px; color: var(--cream-dim); }
+.req b { color: var(--gold); font-family: var(--serif-en); }
+.req .ok { color: var(--gold); }
+.dish .ax.need { color: var(--gold); }
+.dish .avg.met { color: var(--gold); }
+.foot-btns { display: flex; gap: 14px; }
+
+/* 食材圖鑑 */
+.dex-modal { z-index: 65; }
+.dex-box { position: relative; width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow-y: auto; background: var(--navy-light); border: 1px solid var(--gold); padding: 18px 20px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+.dex-box h3 { margin: 0; font-size: 20px; letter-spacing: .08em; }
+.dex-note { margin: 2px 0 10px; font-size: 12px; color: var(--cream-faint); }
+.dex-zone { margin: 12px 0 6px; font-size: 13px; color: var(--gold); letter-spacing: .12em; border-bottom: 1px solid var(--gold-line); padding-bottom: 3px; }
+.dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.dex-item { text-align: left; border: 1px solid var(--gold-line); background: var(--navy); padding: 6px 8px; display: flex; flex-direction: column; gap: 1px; font-size: 13px; cursor: pointer; min-width: 0; }
+.dex-item:hover { border-color: var(--gold); }
+.dex-item.unknown { cursor: default; color: var(--cream-faint); }
+.dex-item .dn { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dex-item .dm { font-size: 11px; color: var(--cream-dim); }
+
 /* 材料詳情 */
 .info-modal { z-index: 70; }
 .info-box { position: relative; width: min(360px, calc(100vw - 32px)); background: var(--navy-light); border: 1px solid var(--gold); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }

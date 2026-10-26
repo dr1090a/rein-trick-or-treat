@@ -37,18 +37,19 @@
       <div class="screen" id="screen-title">
         <p class="eyebrow">Halloween Night · 圖書館餐廳開張</p>
         <h2>今晚，零韻要吃什麼？</h2>
-        <p class="lead">從食材櫃抽材料放上盤子——抽到什麼都得上盤。覺得夠了就收手送餐：估價過線，零韻給你 <b>Treat</b>；不夠，就換她 <b>Trick</b>。<br>鳳梨落盤，直接掀盤。</p>
+        <p class="lead">從食材櫃抽材料放上盤子——抽到什麼都得上盤。每局零韻都會開一個要求，覺得夠了就收手送餐：色香味達標，零韻給你 <b>Treat</b>；不夠，就換她 <b>Trick</b>。<br>鳳梨落盤，直接掀盤。</p>
         <button class="btn primary" id="btnStart">開始點餐</button>
         <details class="rules">
           <summary>規則與小提示</summary>
           <ul>
             <li>每局隨機端出三個容器讓你挑，每種容器自帶一條規則。</li>
             <li>盤子只有九格，不用放滿，隨時可以送餐。抽到什麼都得上盤，你只能決定放哪裡、怎麼轉——唯一能丟的是貼著劇毒標籤的罐子。</li>
-            <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高越值錢，色香味也越好。放不下就會掉到地上，扣分。</li>
-            <li>整盤的色香味平均星數會加成估價。點盤上的材料可以看詳情。</li>
-            <li>中央是主菜位，估價 ×2。組合技的材料要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
-            <li>每放一格，偶爾會發生意外。</li>
-            <li>估價達到 <span class="passline"></span> 就是 Treat。</li>
+            <li>分數就是色香味星數 × 占的格數。每局零韻的要求不一樣，可能是總分，也可能指定「香要夠」。</li>
+            <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高星越多。放不下就會掉到地上，扣分。</li>
+            <li>五行相鄰會互相影響：被相生的 ×1.5，被相剋的 ×0.5。木生火、火生土、土生金、金生水、水生木；木剋土、土剋水、水剋火、火剋金、金剋木。</li>
+            <li>不能吃的東西放上去會扣味。中央是主位 ×2。組合技的材料要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
+            <li>每放一格，偶爾會發生意外。超過要求很多，會有大滿足和傳說級。</li>
+            <li>點盤上的材料可以看詳情；抽過的材料會記在食材圖鑑裡（存在這個瀏覽器）。</li>
             <li>掀盤或即死扣一格血，血條歸零⋯⋯後果自負。</li>
             <li>有些材料湊在一起會發生事情。典故就是提示。</li>
             <li>快捷鍵：空白鍵抽一樣、R 旋轉、1–9 放到第幾格、Enter 送餐、T 切換透明背景（OBS 用）。</li>
@@ -72,9 +73,9 @@
             <h2 id="contName"></h2>
           </div>
           <div class="estimate">
-            <span class="est-label">目前估價</span>
-            <span class="est-value" id="estimate">NT$0</span>
-            <span class="est-line">達標 <span class="passline"></span></span>
+            <span class="est-label">目前分數</span>
+            <span class="est-value" id="estimate">0</span>
+            <span class="est-line" id="reqLine"></span>
           </div>
         </div>
         <div class="board">
@@ -117,7 +118,10 @@
 
   <footer class="foot">
     <span>月上零韻 · 2026 Halloween</span>
-    <button class="linkbtn" id="btnObs">透明背景</button>
+    <span class="foot-btns">
+      <button class="linkbtn" id="btnDex">食材圖鑑</button>
+      <button class="linkbtn" id="btnObs">透明背景</button>
+    </span>
   </footer>
 </div>
 
@@ -136,6 +140,16 @@
 <!-- 材料詳情小視窗 -->
 <div class="modal info-modal" id="infoModal" hidden>
   <div class="info-box" id="infoBox" role="dialog" aria-modal="true"></div>
+</div>
+
+<!-- 食材圖鑑 -->
+<div class="modal dex-modal" id="dexModal" hidden>
+  <div class="dex-box" role="dialog" aria-modal="true">
+    <button class="info-close" id="dexClose" aria-label="關閉">×</button>
+    <h3 id="dexTitle">食材圖鑑</h3>
+    <p class="dex-note">記錄存在這個瀏覽器裡；清除網站資料或換裝置就會歸零。</p>
+    <div id="dexList"></div>
+  </div>
 </div>
 
 <!-- 截圖用的證書本體，放在畫面外 -->
