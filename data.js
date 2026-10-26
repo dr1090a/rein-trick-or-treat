@@ -57,47 +57,47 @@ window.GAME_DATA = {
     { id: "apple",     name: "蘋果",   zone: "mine", element: "火", taste: [3, 1, 2], tags: [], rule: "discount", params: { rate: 0.5 }, lore: "七〇年代「蘋果藏剃刀」都市傳說讓它成為萬聖節拒絕往來戶——統計上幾乎沒有實例，恐慌倒是貨真價實。《本草綱目》：「柰，甘，寒。耐飢。」", verdict: "", sprite: "food_apple.png" },
 
     // ── 套裝A 葛萊普尼爾 ──
-    { id: "cat_footsteps", name: "貓咪的腳步聲", zone: "setA", element: "金", taste: [0, 0, 0], tags: ["sound"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
-    { id: "beard",         name: "女人的鬍鬚",   zone: "setA", element: "金", taste: [0, 0, 0], tags: ["inedible"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "mountain_root", name: "山的根",       zone: "setA", element: "土", taste: [0, 0, 0], tags: ["inedible"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "bear_sinew",    name: "熊的腳筋",     zone: "setA", element: "木", taste: [1, 1, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "fish_breath",   name: "魚的呼吸",     zone: "setA", element: "金", taste: [0, 0, 0], tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "bird_spittle",  name: "鳥的唾液",     zone: "setA", element: "水", taste: [2, 1, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "cat_footsteps", name: "貓咪的腳步聲", zone: "setA", element: "金", taste: [0, 0, 0], tags: ["sound"], rule: null, lore: "《散文埃達》：矮人以六樣東西鍛成縛住魔狼芬里爾的緞帶，材料從此在世上用罄——所以今天的貓走路沒有聲音。罐子是空的，請不要搖。", verdict: "", sprite: "jar_empty.png" },
+    { id: "beard",         name: "女人的鬍鬚",   zone: "setA", element: "金", taste: [0, 0, 0], tags: ["inedible"], rule: null, lore: "葛萊普尼爾第二件。據說也是因為被拿去鍛了緞帶，女人才不長鬍子。北歐神話的因果關係，請勿深究。", verdict: "", sprite: "jar.png" },
+    { id: "mountain_root", name: "山的根",       zone: "setA", element: "土", taste: [0, 0, 0], tags: ["inedible"], rule: null, lore: "第三件。山的根全被挖去打緞帶了，所以山沒有根。重量不明，硬度極高，牙齒請自重。", verdict: "", sprite: "jar.png" },
+    { id: "bear_sinew",    name: "熊的腳筋",     zone: "setA", element: "木", taste: [1, 1, 2], tags: [], rule: null, lore: "第四件，六樣裡少數聽起來能吃的。魔狼被緞帶綁住後咬斷了戰神提爾的右手，算是本套裝最大的售後糾紛。", verdict: "", sprite: "jar.png" },
+    { id: "fish_breath",   name: "魚的呼吸",     zone: "setA", element: "金", taste: [0, 0, 0], tags: [], rule: null, lore: "第五件。魚沒有呼吸，據說就是因為這個。罐裡只有一點水氣和一個泡泡，打開的瞬間就沒了。", verdict: "", sprite: "jar.png" },
+    { id: "bird_spittle",  name: "鳥的唾液",     zone: "setA", element: "水", taste: [2, 1, 2], tags: [], rule: null, lore: "第六件，也是最後一件。湊齊六件的人，可以做出全場最難的甜點；湊不齊的人，手上會有一罐鳥的口水。", verdict: "", sprite: "jar.png" },
 
     // ── 套裝B 竹取五難題 ──
     // 竹取五件都不能吃（inedible）；贗品色香味全 0；verdictFake = 吃到贗品時的判詞
-    { id: "buddha_bowl",    name: "佛的石缽",   zone: "setB", element: "土", taste: [1, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "hourai_branch",  name: "蓬萊玉枝",   zone: "setB", element: "金", taste: [3, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "buddha_bowl",    name: "佛的石缽",   zone: "setB", element: "土", taste: [1, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "輝夜姬五難題之一：天竺佛陀用過的石缽，據說會自己發光。原作的石作皇子拿山寺裡一只燻黑的舊缽充數，不會發光，當場穿幫。這一只呢？", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "hourai_branch",  name: "蓬萊玉枝",   zone: "setB", element: "金", taste: [3, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "東海蓬萊山上的樹枝：銀根、金莖、白玉果實。原作的車持皇子請工匠打造了一枝，完美無缺——直到工匠們上門討工錢。", verdict: "", verdictFake: "", sprite: "jar.png" },
     // 火鼠裘贗品上盤自燃連累整盤 → 走 endings 的 fire_rat_ignite
-    { id: "fire_rat_robe",  name: "火鼠裘",     zone: "setB", element: "火", taste: [2, 0, 0],  tags: ["inedible"], rule: "authenticity", params: { fakeEffect: "self_ignite" }, lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "dragon_pearl",   name: "龍頸之珠",   zone: "setB", element: "金", taste: [3, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "swallow_shell",  name: "燕之子安貝", zone: "setB", element: "金", taste: [2, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "fire_rat_robe",  name: "火鼠裘",     zone: "setB", element: "火", taste: [2, 0, 0],  tags: ["inedible"], rule: "authenticity", params: { fakeEffect: "self_ignite" }, lore: "火鼠之毛織成，入火不燃，髒了丟進火裡就會變乾淨。原作的阿倍右大臣重金向唐商買來，一燒就著。驗貨的方法，只有一個。", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "dragon_pearl",   name: "龍頸之珠",   zone: "setB", element: "金", taste: [3, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "龍頸上的五色寶珠。原作的大伴大納言親自出海取珠，遇上暴風雨，從此改口說龍是神、不可冒犯。本館不保證這顆摘自龍的脖子。", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "swallow_shell",  name: "燕之子安貝", zone: "setB", element: "金", taste: [2, 0, 0], tags: ["inedible"], rule: "authenticity", lore: "燕子產子時銜著的安產寶貝。原作的石上中納言爬上屋樑掏燕巢，摔下來時手裡緊握的是一團燕子糞，不久便過世。五難題裡唯一出人命的一題。", verdict: "", verdictFake: "", sprite: "jar.png" },
 
     // ── 套裝C 飛行軟膏 ──
-    { id: "belladonna", name: "顛茄",   zone: "setC", element: "木", taste: [3, 1, 1], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "henbane",    name: "天仙子", zone: "setC", element: "木", taste: [1, 2, 1], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "aconite",    name: "烏頭",   zone: "setC", element: "木", taste: [2, 1, 0], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "belladonna", name: "顛茄",   zone: "setC", element: "木", taste: [3, 1, 1], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "Bella donna，義大利文「美麗的女士」：文藝復興貴婦把它滴進眼睛放大瞳孔，看起來水汪汪，同時也看不清楚。屬名 Atropa 取自剪斷生命之線的命運女神。", verdict: "", sprite: "jar.png" },
+    { id: "henbane",    name: "天仙子", zone: "setC", element: "木", taste: [1, 2, 1], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "中藥名莨菪，飛行軟膏主成分之一。《神農本草經》：「多食令人狂走。久服輕身，走及奔馬。」古人吃了以為自己在飛，大概就是這個意思。", verdict: "", sprite: "jar.png" },
+    { id: "aconite",    name: "烏頭",   zone: "setC", element: "木", taste: [2, 1, 0], tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "與附子同一株：主根叫烏頭，旁生的子根叫附子。《三國演義》關羽刮骨療毒，箭上淬的就是烏頭。《本草綱目》：「烏頭，辛，溫，有大毒。」", verdict: "", sprite: "jar.png" },
 
     // ── 散裝魔幻 ──
-    { id: "mandrake",            name: "曼德拉草",         zone: "loose", element: "木", taste: [1, 1, 2], tags: ["witch"], rule: "instadeath", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "macbeth_pack",        name: "馬克白香料包",     zone: "loose", element: "火", taste: [1, 2, 1], tags: ["witch", "dog_tongue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "unicorn_horn_powder", name: "獨角兔的角粉",     zone: "loose", element: "金", taste: [2, 1, 1], tags: [], rule: "neutralize_once", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "amabie_scale",        name: "阿瑪比埃的鱗片",   zone: "loose", element: "水", taste: [2, 1, 1], tags: ["yokai"], rule: "immune_once", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "mermaid_flesh",       name: "人魚肉",           zone: "loose", element: "水", taste: [2, 1, 3], tags: ["longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "lethe_water",         name: "忘川水",           zone: "loose", element: "水", taste: [0, 0, 1], tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "jade_rabbit_elixir",  name: "玉兔搗的藥",       zone: "loose", element: "水", taste: [2, 2, 2], tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "flat_peach",          name: "蟠桃",             zone: "loose", element: "木", taste: [3, 3, 3], tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "dragon_blood",        name: "龍血",             zone: "loose", element: "火", taste: [3, 1, 2], tags: ["liquid", "highvalue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "taisui",              name: "太歲",             zone: "loose", element: "土", taste: [1, 1, 2], tags: ["highvalue", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "mandrake",            name: "曼德拉草",         zone: "loose", element: "木", taste: [1, 1, 2], tags: ["witch"], rule: "instadeath", lore: "根長得像人，拔出土時會尖叫，聽見的人當場斃命——所以古法是把狗綁在根上，讓狗去拔。《本草綱目》引周密記「押不蘆」，少許磨酒飲，「即通身麻痺而死」，據考就是它。", verdict: "", sprite: "jar.png" },
+    { id: "macbeth_pack",        name: "馬克白香料包",     zone: "loose", element: "火", taste: [1, 2, 1], tags: ["witch", "dog_tongue"], rule: null, lore: "《馬克白》三女巫的燉鍋配方：蠑螈之眼、青蛙之趾、蝙蝠之毛、犬之舌。一說這些全是草藥的俗名代號，犬之舌就是琉璃草。本包兩種解讀皆有附上。", verdict: "", sprite: "jar.png" },
+    { id: "unicorn_horn_powder", name: "獨角兔的角粉",     zone: "loose", element: "金", taste: [2, 1, 1], tags: [], rule: "neutralize_once", lore: "Al-mi'raj，中世紀伊斯蘭奇書裡的一角兔，黃毛黑角，猛獸見之皆逃。角粉則沿用歐洲王室的老把戲：拿獨角鯨的牙冒充獨角獸角，用來試毒。", verdict: "", sprite: "jar.png" },
+    { id: "amabie_scale",        name: "阿瑪比埃的鱗片",   zone: "loose", element: "水", taste: [2, 1, 1], tags: ["yokai"], rule: "immune_once", lore: "1846 年出現在肥後國（今熊本）海上的半人半魚妖怪，只留下一句話：「若有疫病流行，把我的樣子畫給人看。」2020 年再度爆紅，連日本厚生勞動省都請它代言。", verdict: "", sprite: "jar.png" },
+    { id: "mermaid_flesh",       name: "人魚肉",           zone: "loose", element: "水", taste: [2, 1, 3], tags: ["longevity"], rule: null, lore: "若狹國的少女誤食人魚肉，從此容顏不老，活了八百年，人稱八百比丘尼。《山海經》也說人魚「食之無癡疾」——只是沒說會不會長生。", verdict: "", sprite: "jar.png" },
+    { id: "lethe_water",         name: "忘川水",           zone: "loose", element: "水", taste: [0, 0, 1], tags: ["liquid"], rule: null, lore: "希臘冥府的忘川。柏拉圖《理想國》說亡魂投胎前都要喝它，忘記前世。東方版本叫孟婆湯，差別在要排隊。無色無味，喝完不記得喝過。", verdict: "", sprite: "jar.png" },
+    { id: "jade_rabbit_elixir",  name: "玉兔搗的藥",       zone: "loose", element: "水", taste: [2, 2, 2], tags: ["lunar", "longevity"], rule: null, lore: "月宮玉兔搗的不死藥，嫦娥偷吃的就是這款。李白〈把酒問月〉：「白兔搗藥秋復春，嫦娥孤棲與誰鄰。」搗了一千多年，產量依然成謎。", verdict: "", sprite: "jar.png" },
+    { id: "flat_peach",          name: "蟠桃",             zone: "loose", element: "木", taste: [3, 3, 3], tags: ["lunar", "longevity"], rule: null, lore: "王母娘娘蟠桃園出品。《西遊記》土地公介紹：「三千年一熟，人吃了成仙了道，體健身輕。」六千年、九千年那幾批，被一隻猴子吃掉了。", verdict: "", sprite: "jar.png" },
+    { id: "dragon_blood",        name: "龍血",             zone: "loose", element: "火", taste: [3, 1, 2], tags: ["liquid", "highvalue"], rule: null, lore: "其實是樹脂：索科特拉島的龍血樹割開會流出暗紅色的汁，《本草綱目》收作「騏驎竭」，散瘀止痛。另一派則是齊格飛沐浴龍血，成了刀槍不入之身。", verdict: "", sprite: "jar.png" },
+    { id: "taisui",              name: "太歲",             zone: "loose", element: "土", taste: [1, 1, 2], tags: ["highvalue", "longevity"], rule: null, lore: "《山海經》稱「視肉」，晉人郭璞注：「形如牛肝，有兩目，食之無盡，尋復更生如故。」吃完會長回來的肉，現代人看了多半說是黏菌。在它頭上動土，後果自負。", verdict: "", sprite: "jar.png" },
     // 吉凶待月月裁定 → 定案後把 rule 換成 null（吉）或 discount / instadeath（凶）
-    { id: "kesaran_pasaran",     name: "幸運毛球",         zone: "loose", element: "金", taste: [2, 0, 0], tags: ["yokai"], rule: "pending", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", element: "金", taste: [0, 0, 0], tags: ["sound", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
-    { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", element: "水", taste: [2, 2, 1], tags: ["liquid", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "kesaran_pasaran",     name: "幸運毛球",         zone: "loose", element: "金", taste: [2, 0, 0], tags: ["yokai"], rule: "pending", lore: "日本東北流傳的白色毛球，會自己飄。據說養在桐木盒裡、餵它白粉，就會帶來幸福；但一年打開看超過一次，它就會消失。吃下去是吉是凶，目前沒有人知道。", verdict: "", sprite: "jar.png" },
+    { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", element: "金", taste: [0, 0, 0], tags: ["sound", "yokai"], rule: null, lore: "《平家物語》：每夜黑雲籠罩清涼殿，天皇因此病倒，源賴政一箭射下——猴頭、狸身、虎足、蛇尾。至於那駭人的叫聲，其實是夜裡鳴叫的虎鶇。罐子是空的，只有聲音。", verdict: "", sprite: "jar_empty.png" },
+    { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", element: "水", taste: [2, 2, 1], tags: ["liquid", "yokai"], rule: null, lore: "晴天裡落下的雨。東亞許多地方都說，這是狐狸趁著天晴出嫁，拿雨幕遮住迎親隊伍。同時是晴天也是雨天的水，喝起來有一點喜酒味。", verdict: "", sprite: "jar.png" },
     // 有妖怪履歷的正常食材：zone 放 loose 進魔幻池
     { id: "azukiarai_bean",      name: "小豆洗的紅豆",     zone: "loose", element: "土", taste: [2, 1, 2], tags: ["yokai"], rule: null, lore: "河邊唰唰洗豆的妖怪洗過的紅豆：履歷乾淨，來歷不明。紅豆本人則是台灣萬丹的驕傲。《本草綱目》：「赤小豆，甘酸，平。下水腫，排癰腫。」", verdict: "", sprite: "food_redbean.png" },
 
     // ── 特殊罐 ──
-    { id: "busu_jar", name: "附子罐", zone: "special", element: "土", taste: [0, 0, 3], tags: [], rule: "fake_label", params: { label: "劇毒" }, lore: "", verdict: "", sprite: "jar_skull.png" }
+    { id: "busu_jar", name: "附子罐", zone: "special", element: "土", taste: [0, 0, 3], tags: [], rule: "fake_label", params: { label: "劇毒" }, lore: "狂言《附子》：主人出門前交代，桶裡裝的是附子，光是從桶口吹過來的風都會要人命，千萬別靠近。太郎冠者與次郎冠者看著那個桶，看了很久。", verdict: "", sprite: "jar_skull.png" }
   ],
 
   containers: [
