@@ -43,13 +43,15 @@
           <summary>規則與小提示</summary>
           <ul>
             <li>每局隨機端出三個容器讓你挑，每種容器自帶一條規則。</li>
-            <li>盤子只有九格。抽到什麼都得上盤，你只能決定放哪一格——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>盤子只有九格，不用放滿，隨時可以送餐。抽到什麼都得上盤，你只能決定放哪裡、怎麼轉——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高越值錢，色香味也越好。放不下就會掉到地上，扣分。</li>
+            <li>整盤的色香味平均星數會加成估價。點盤上的材料可以看詳情。</li>
             <li>中央是主菜位，估價 ×2。組合技的材料要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
             <li>每放一格，偶爾會發生意外。</li>
             <li>估價達到 <span class="passline"></span> 就是 Treat。</li>
             <li>掀盤或即死扣一格血，血條歸零⋯⋯後果自負。</li>
             <li>有些材料湊在一起會發生事情。典故就是提示。</li>
-            <li>快捷鍵：空白鍵抽一樣、1–9 放到第幾格、Enter 送餐、T 切換透明背景（OBS 用）。</li>
+            <li>快捷鍵：空白鍵抽一樣、R 旋轉、1–9 放到第幾格、Enter 送餐、T 切換透明背景（OBS 用）。</li>
           </ul>
         </details>
         <div class="album" id="album"></div>
@@ -82,8 +84,12 @@
               <p class="tray-label">手上的材料</p>
               <div class="tray-slot" id="traySlot"><span class="tray-empty">先抽一樣</span></div>
               <p class="tray-hint" id="trayHint"></p>
-              <button class="btn small" id="btnDiscard" hidden>丟掉</button>
+              <div class="tray-btns">
+                <button class="btn small" id="btnRotate" hidden>旋轉 (R)</button>
+                <button class="btn small" id="btnDiscard" hidden>丟掉</button>
+              </div>
             </div>
+            <div class="dish" id="dish"></div>
             <div class="combo-line" id="comboLine"></div>
           </div>
         </div>
@@ -125,6 +131,11 @@
     </div>
     <p class="hint">手機可長按圖片儲存</p>
   </div>
+</div>
+
+<!-- 材料詳情小視窗 -->
+<div class="modal info-modal" id="infoModal" hidden>
+  <div class="info-box" id="infoBox" role="dialog" aria-modal="true"></div>
 </div>
 
 <!-- 截圖用的證書本體，放在畫面外 -->

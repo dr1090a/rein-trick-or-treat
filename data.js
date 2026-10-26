@@ -8,6 +8,8 @@
 // ── 代號表 ──────────────────────────────────────────
 // zone        normal 正常食材 / mine 地雷 / setA 葛萊普尼爾 / setB 竹取五難題
 //             setC 飛行軟膏 / loose 散裝魔幻 / special 特殊罐
+// element     屬性（顯示用）：水 火 土 木 風 月 闇
+// taste       色香味星數 [色, 香, 味]，0–3；稀有度會往上加（見 config.rarities）
 // tags        liquid 液體（河童皿、骷髏杯看這個）/ sound 聲音系 / witch 魔女系（大釜加成）
 //             toxic 毒物 / yokai 妖怪履歷 / longevity 長生系判詞 / lunar 月見系
 //             highvalue 高價材料 / dog_tongue 含犬之舌（曼德拉草安全處理）
@@ -31,68 +33,68 @@
 window.GAME_DATA = {
   ingredients: [
     // ── 正常食材 ──
-    { id: "flour",     name: "麵粉",   zone: "normal", price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_flour.png" },
-    { id: "egg",       name: "雞蛋",   zone: "normal", price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_egg.png" },
-    { id: "raw_sugar", name: "二砂糖", zone: "normal", price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_sugar.png" },
-    { id: "butter",    name: "奶油",   zone: "normal", price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_butter.png" },
-    { id: "milk",      name: "牛奶",   zone: "normal", price: 100, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_milk.png" },
+    { id: "flour",     name: "麵粉",   zone: "normal", element: "土", taste: [1, 0, 1], price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_flour.png" },
+    { id: "egg",       name: "雞蛋",   zone: "normal", element: "土", taste: [1, 1, 1], price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_egg.png" },
+    { id: "raw_sugar", name: "二砂糖", zone: "normal", element: "土", taste: [1, 0, 2], price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_sugar.png" },
+    { id: "butter",    name: "奶油",   zone: "normal", element: "土", taste: [1, 2, 2], price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_butter.png" },
+    { id: "milk",      name: "牛奶",   zone: "normal", element: "水", taste: [1, 1, 1], price: 100, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_milk.png" },
     // 蜂蜜算不算液體待定；目前算，讓骷髏杯不至於只有四樣能放
-    { id: "honey",     name: "蜂蜜",   zone: "normal", price: 150, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_honey.png" },
-    { id: "cinnamon",  name: "肉桂",   zone: "normal", price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_cinnamon.png" },
-    { id: "pumpkin",   name: "南瓜",   zone: "normal", price: 200, tags: [], rule: null, lore: "", verdict: "", sprite: "food_pumpkin.png" },
-    { id: "osmanthus", name: "桂花",   zone: "normal", price: 150, tags: ["lunar"], rule: null, lore: "", verdict: "", sprite: "food_osmanthus.png" },
-    { id: "banana",    name: "香蕉",   zone: "normal", price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_banana.png" },
-    { id: "cranberry", name: "蔓越莓", zone: "normal", price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_cranberry.png" },
+    { id: "honey",     name: "蜂蜜",   zone: "normal", element: "水", taste: [2, 2, 2], price: 150, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_honey.png" },
+    { id: "cinnamon",  name: "肉桂",   zone: "normal", element: "火", taste: [1, 3, 1], price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_cinnamon.png" },
+    { id: "pumpkin",   name: "南瓜",   zone: "normal", element: "土", taste: [3, 1, 2], price: 200, tags: [], rule: null, lore: "", verdict: "", sprite: "food_pumpkin.png" },
+    { id: "osmanthus", name: "桂花",   zone: "normal", element: "木", taste: [2, 3, 1], price: 150, tags: ["lunar"], rule: null, lore: "", verdict: "", sprite: "food_osmanthus.png" },
+    { id: "banana",    name: "香蕉",   zone: "normal", element: "木", taste: [2, 2, 2], price: 100, tags: [], rule: null, lore: "", verdict: "", sprite: "food_banana.png" },
+    { id: "cranberry", name: "蔓越莓", zone: "normal", element: "木", taste: [3, 1, 1], price: 150, tags: [], rule: null, lore: "", verdict: "", sprite: "food_cranberry.png" },
 
     // ── 地雷 ──
     // 鳳梨的 price 只在披薩容器或夏威夷結局時有意義
-    { id: "pineapple", name: "鳳梨",   zone: "mine", price: 150, tags: [], rule: "flip", lore: "", verdict: "", sprite: "food_pineapple.png" },
-    { id: "raisin",    name: "葡萄乾", zone: "mine", price: 50,  tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_raisin.png" },
+    { id: "pineapple", name: "鳳梨",   zone: "mine", element: "木", taste: [3, 2, 3], price: 150, tags: [], rule: "flip", lore: "", verdict: "", sprite: "food_pineapple.png" },
+    { id: "raisin",    name: "葡萄乾", zone: "mine", element: "木", taste: [0, 0, 1], price: 50,  tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_raisin.png" },
     // 蘋果折價比例 spec 未定，暫填同葡萄乾
-    { id: "apple",     name: "蘋果",   zone: "mine", price: 100, tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_apple.png" },
+    { id: "apple",     name: "蘋果",   zone: "mine", element: "木", taste: [3, 1, 2], price: 100, tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_apple.png" },
 
     // ── 套裝A 葛萊普尼爾 ──
-    { id: "cat_footsteps", name: "貓咪的腳步聲", zone: "setA", price: 300, tags: ["sound"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
-    { id: "beard",         name: "女人的鬍鬚",   zone: "setA", price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "mountain_root", name: "山的根",       zone: "setA", price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "bear_sinew",    name: "熊的腳筋",     zone: "setA", price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "fish_breath",   name: "魚的呼吸",     zone: "setA", price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "bird_spittle",  name: "鳥的唾液",     zone: "setA", price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "cat_footsteps", name: "貓咪的腳步聲", zone: "setA", element: "風", taste: [0, 0, 0], price: 300, tags: ["sound"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
+    { id: "beard",         name: "女人的鬍鬚",   zone: "setA", element: "闇", taste: [0, 0, 0], price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "mountain_root", name: "山的根",       zone: "setA", element: "土", taste: [0, 0, 0], price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "bear_sinew",    name: "熊的腳筋",     zone: "setA", element: "闇", taste: [0, 0, 0], price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "fish_breath",   name: "魚的呼吸",     zone: "setA", element: "風", taste: [0, 0, 0], price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "bird_spittle",  name: "鳥的唾液",     zone: "setA", element: "風", taste: [0, 0, 0], price: 300, tags: [], rule: null, lore: "", verdict: "", sprite: "jar.png" },
 
     // ── 套裝B 竹取五難題 ──
     // fakePrice = 贗品標價；verdictFake = 吃到贗品時的判詞
-    { id: "buddha_bowl",    name: "佛的石缽",   zone: "setB", price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "hourai_branch",  name: "蓬萊玉枝",   zone: "setB", price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "buddha_bowl",    name: "佛的石缽",   zone: "setB", element: "土", taste: [1, 0, 0], price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "hourai_branch",  name: "蓬萊玉枝",   zone: "setB", element: "月", taste: [3, 1, 0], price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
     // 火鼠裘贗品上盤自燃連累整盤 → 走 endings 的 fire_rat_ignite
-    { id: "fire_rat_robe",  name: "火鼠裘",     zone: "setB", price: 400, fakePrice: 0,  tags: [], rule: "authenticity", params: { fakeEffect: "self_ignite" }, lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "dragon_pearl",   name: "龍頸之珠",   zone: "setB", price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
-    { id: "swallow_shell",  name: "燕之子安貝", zone: "setB", price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "fire_rat_robe",  name: "火鼠裘",     zone: "setB", element: "火", taste: [2, 0, 0], price: 400, fakePrice: 0,  tags: [], rule: "authenticity", params: { fakeEffect: "self_ignite" }, lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "dragon_pearl",   name: "龍頸之珠",   zone: "setB", element: "月", taste: [3, 1, 0], price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
+    { id: "swallow_shell",  name: "燕之子安貝", zone: "setB", element: "月", taste: [2, 1, 0], price: 400, fakePrice: 50, tags: [], rule: "authenticity", lore: "", verdict: "", verdictFake: "", sprite: "jar.png" },
 
     // ── 套裝C 飛行軟膏 ──
-    { id: "belladonna", name: "顛茄",   zone: "setC", price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "henbane",    name: "天仙子", zone: "setC", price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "aconite",    name: "烏頭",   zone: "setC", price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "belladonna", name: "顛茄",   zone: "setC", element: "闇", taste: [3, 1, 1], price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "henbane",    name: "天仙子", zone: "setC", element: "闇", taste: [1, 2, 1], price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "aconite",    name: "烏頭",   zone: "setC", element: "闇", taste: [2, 1, 0], price: 250, tags: ["witch", "toxic"], rule: "toxic_risk", params: { chance: 0.3 }, lore: "", verdict: "", sprite: "jar.png" },
 
     // ── 散裝魔幻 ──
-    { id: "mandrake",            name: "曼德拉草",         zone: "loose", price: 500, tags: ["witch"], rule: "instadeath", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "macbeth_pack",        name: "馬克白香料包",     zone: "loose", price: 300, tags: ["witch", "dog_tongue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "unicorn_horn_powder", name: "獨角兔的角粉",     zone: "loose", price: 300, tags: [], rule: "neutralize_once", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "amabie_scale",        name: "アマビエ的鱗片",   zone: "loose", price: 300, tags: ["yokai"], rule: "immune_once", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "mermaid_flesh",       name: "人魚肉",           zone: "loose", price: 500, tags: ["longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "lethe_water",         name: "忘川水",           zone: "loose", price: 300, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "jade_rabbit_elixir",  name: "玉兔搗的藥",       zone: "loose", price: 400, tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "flat_peach",          name: "蟠桃",             zone: "loose", price: 400, tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "dragon_blood",        name: "龍血",             zone: "loose", price: 800, tags: ["liquid", "highvalue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
-    { id: "taisui",              name: "太歲",             zone: "loose", price: 800, tags: ["highvalue", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "mandrake",            name: "曼德拉草",         zone: "loose", element: "闇", taste: [1, 1, 2], price: 500, tags: ["witch"], rule: "instadeath", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "macbeth_pack",        name: "馬克白香料包",     zone: "loose", element: "闇", taste: [1, 2, 1], price: 300, tags: ["witch", "dog_tongue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "unicorn_horn_powder", name: "獨角兔的角粉",     zone: "loose", element: "月", taste: [2, 1, 1], price: 300, tags: [], rule: "neutralize_once", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "amabie_scale",        name: "アマビエ的鱗片",   zone: "loose", element: "水", taste: [2, 1, 1], price: 300, tags: ["yokai"], rule: "immune_once", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "mermaid_flesh",       name: "人魚肉",           zone: "loose", element: "水", taste: [2, 1, 3], price: 500, tags: ["longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "lethe_water",         name: "忘川水",           zone: "loose", element: "水", taste: [0, 0, 1], price: 300, tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "jade_rabbit_elixir",  name: "玉兔搗的藥",       zone: "loose", element: "月", taste: [2, 2, 2], price: 400, tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "flat_peach",          name: "蟠桃",             zone: "loose", element: "木", taste: [3, 3, 3], price: 400, tags: ["lunar", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "dragon_blood",        name: "龍血",             zone: "loose", element: "火", taste: [3, 1, 2], price: 800, tags: ["liquid", "highvalue"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "taisui",              name: "太歲",             zone: "loose", element: "土", taste: [1, 1, 2], price: 800, tags: ["highvalue", "longevity"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     // 吉凶待月月裁定 → 定案後把 rule 換成 null（吉）或 discount / instadeath（凶）
-    { id: "kesaran_pasaran",     name: "ケサランパサラン", zone: "loose", price: 300, tags: ["yokai"], rule: "pending", lore: "", verdict: "", sprite: "jar.png" },
-    { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", price: 300, tags: ["sound", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
-    { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", price: 400, tags: ["liquid", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
+    { id: "kesaran_pasaran",     name: "ケサランパサラン", zone: "loose", element: "風", taste: [2, 0, 0], price: 300, tags: ["yokai"], rule: "pending", lore: "", verdict: "", sprite: "jar.png" },
+    { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", element: "風", taste: [0, 0, 0], price: 300, tags: ["sound", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
+    { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", element: "水", taste: [2, 2, 1], price: 400, tags: ["liquid", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     // 有妖怪履歷的正常食材：zone 放 loose 進魔幻池，標價照正常食材
-    { id: "azukiarai_bean",      name: "小豆洗的紅豆",     zone: "loose", price: 150, tags: ["yokai"], rule: null, lore: "", verdict: "", sprite: "food_redbean.png" },
+    { id: "azukiarai_bean",      name: "小豆洗的紅豆",     zone: "loose", element: "土", taste: [2, 1, 2], price: 150, tags: ["yokai"], rule: null, lore: "", verdict: "", sprite: "food_redbean.png" },
 
     // ── 特殊罐 ──
-    { id: "busu_jar", name: "附子罐", zone: "special", price: 1000, tags: [], rule: "fake_label", params: { label: "劇毒" }, lore: "", verdict: "", sprite: "jar_skull.png" }
+    { id: "busu_jar", name: "附子罐", zone: "special", element: "闇", taste: [0, 0, 3], price: 1000, tags: [], rule: "fake_label", params: { label: "劇毒" }, lore: "", verdict: "", sprite: "jar_skull.png" }
   ],
 
   containers: [
@@ -103,7 +105,7 @@ window.GAME_DATA = {
     { id: "pandora_pithos",  name: "潘朵拉的甕",     rule: "keep_one_on_fail", baseScore: 0, lore: "", verdict: "" },
     { id: "kappa_plate",     name: "河童的頭皿",     rule: "need_liquid", baseScore: 0, params: { penaltyPerTurn: 100 }, lore: "", verdict: "" },
     { id: "treasure_bowl",   name: "聚寶盆",         rule: "duplicate_one", baseScore: 0, lore: "", verdict: "" },
-    // 抽到的材料強制上盤 vs 只能放液體：非液體抽到時怎麼處理待定（灑出不計分？）
+    // 非液體一律打成果汁上盤，估價 ×config.juiceRate；鳳梨汁照樣掀盤
     { id: "byron_skull_cup", name: "拜倫的骷髏杯",   rule: "liquid_only", baseScore: 0, params: { liquidMultiplier: 1.5 }, lore: "", verdict: "" },
     { id: "witch_cauldron",  name: "魔女大釜",       rule: "witch_bonus", baseScore: 0, params: { witchMultiplier: 1.5 }, lore: "", verdict: "" },
     // 提案中，待月月裁定；enabled: false 時不出現在選單
@@ -156,7 +158,7 @@ window.GAME_DATA = {
   ],
 
   config: {
-    passLine: 2000,        // 達標線，固定值先上，直播實測再調
+    passLine: 3000,        // 達標線；2026-10-26 改九格＋稀有度後，隨機測試未翻盤局中位數約 3000
     hawaiianChance: 0.01,  // 鳳梨反給最高分
     fakeChance: 0.5,       // 竹取盲盒抽到贗品的機率
     maxHp: 3,              // 掀盤扣血，歸零觸發 rampage
@@ -165,6 +167,17 @@ window.GAME_DATA = {
     // 抽卡時各區的權重（同區內平均）；套裝有一件上盤後，同套其他件權重 × setBoost
     zoneWeights: { normal: 46, mine: 12, setA: 8, setB: 8, setC: 6, loose: 18, special: 2 },
     setBoost: 4,
+    // 隨機品質：weight 抽中權重、size 占幾格（1 單格 / 2 直條 / 3 L 形 / 4 田字）、mult 估價倍率
+    // starUp 色香味加成：0 不加 / "one" 隨機一項 +1 / "all" 三項 +1 / "max" 全滿；prefix 加在名字前
+    rarities: [
+      { id: "R",   weight: 60, size: 1, mult: 1,   starUp: 0,     prefix: "" },
+      { id: "SR",  weight: 26, size: 2, mult: 2.4, starUp: "one", prefix: "" },
+      { id: "SSR", weight: 10, size: 3, mult: 3.8, starUp: "all", prefix: "" },
+      { id: "UR",  weight: 4,  size: 4, mult: 5.5, starUp: "max", prefix: "神級" }
+    ],
+    starBonus: 0.1,         // 整盤色香味平均每 1 顆星，估價 +10%（三項全滿 = ×1.9）
+    juiceRate: 0.5,         // 骷髏杯把非液體打成果汁，估價 ×0.5
+    dropPenaltyRate: 0.5,   // 盤子放不下掉到地上：扣該材料估價 ×0.5
     gridSize: 3,            // 盤子 3×3 = 9 格，就是食材上限；放滿自動送餐
     centerMultiplier: 2,    // 中央主菜位的估價倍率
     containerChoices: 3,    // 每局隨機給幾個容器挑；設 1 = 完全隨機
