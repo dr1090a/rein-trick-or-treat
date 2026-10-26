@@ -36,25 +36,25 @@
 window.GAME_DATA = {
   ingredients: [
     // ── 正常食材 ──
-    { id: "flour",     name: "麵粉",   zone: "normal", element: "土", taste: [1, 0, 1], tags: [], rule: null, lore: "", verdict: "", sprite: "food_flour.png" },
-    { id: "egg",       name: "雞蛋",   zone: "normal", element: "土", taste: [1, 1, 1], tags: [], rule: null, lore: "", verdict: "", sprite: "food_egg.png" },
-    { id: "raw_sugar", name: "二砂糖", zone: "normal", element: "土", taste: [1, 0, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "food_sugar.png" },
-    { id: "butter",    name: "奶油",   zone: "normal", element: "土", taste: [1, 2, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "food_butter.png" },
-    { id: "milk",      name: "牛奶",   zone: "normal", element: "水", taste: [1, 1, 1], tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_milk.png" },
+    { id: "flour",     name: "麵粉",   zone: "normal", element: "土", taste: [1, 0, 1], tags: [], rule: null, lore: "小麥磨成的粉。所謂筋度就是蛋白質含量：高筋做麵包、低筋做蛋糕、中筋做一切。《本草綱目》：「小麥，甘，微寒。除熱，止煩渴。」", verdict: "", sprite: "food_flour.png" },
+    { id: "egg",       name: "雞蛋",   zone: "normal", element: "土", taste: [1, 1, 1], tags: [], rule: null, lore: "蛋黃的顏色來自飼料裡的葉黃素，跟營養無關。台灣人一年人均吃掉三百多顆。《本草綱目》：「雞子，甘，平。鎮心，安五臟。」", verdict: "", sprite: "food_egg.png" },
+    { id: "raw_sugar", name: "二砂糖", zone: "normal", element: "土", taste: [1, 0, 2], tags: [], rule: null, lore: "第二道結晶的蔗糖，台糖出品的古早味；那股焦香是精煉前的甘蔗本色。《本草綱目》：「沙糖，甘，寒。潤心肺，解酒毒。」", verdict: "", sprite: "food_sugar.png" },
+    { id: "butter",    name: "奶油",   zone: "normal", element: "土", taste: [1, 2, 2], tags: [], rule: null, lore: "牛乳攪打出的脂肪。古人把乳製品精煉分級，最上等的叫醍醐——醍醐灌頂澆下去的就是這個。《本草綱目》：「酥，甘，微寒。益虛勞，潤臟腑。」", verdict: "", sprite: "food_butter.png" },
+    { id: "milk",      name: "牛奶",   zone: "normal", element: "水", taste: [1, 1, 1], tags: ["liquid"], rule: null, lore: "白色不是脂肪的顏色，是酪蛋白散射光的顏色。加熱浮起的那層奶皮是蛋白質帶著脂肪，撈掉等於撈掉精華。《本草綱目》：「牛乳，甘，微寒。補虛羸，止渴。」", verdict: "", sprite: "food_milk.png" },
     // 蜂蜜算不算液體待定；目前算，讓骷髏杯不至於只有四樣能放
-    { id: "honey",     name: "蜂蜜",   zone: "normal", element: "水", taste: [2, 2, 2], tags: ["liquid"], rule: null, lore: "", verdict: "", sprite: "food_honey.png" },
-    { id: "cinnamon",  name: "肉桂",   zone: "normal", element: "火", taste: [1, 3, 1], tags: [], rule: null, lore: "", verdict: "", sprite: "food_cinnamon.png" },
-    { id: "pumpkin",   name: "南瓜",   zone: "normal", element: "土", taste: [3, 1, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "food_pumpkin.png" },
-    { id: "osmanthus", name: "桂花",   zone: "normal", element: "木", taste: [2, 3, 1], tags: ["lunar"], rule: null, lore: "", verdict: "", sprite: "food_osmanthus.png" },
-    { id: "banana",    name: "香蕉",   zone: "normal", element: "木", taste: [2, 2, 2], tags: [], rule: null, lore: "", verdict: "", sprite: "food_banana.png" },
-    { id: "cranberry", name: "蔓越莓", zone: "normal", element: "火", taste: [3, 1, 1], tags: [], rule: null, lore: "", verdict: "", sprite: "food_cranberry.png" },
+    { id: "honey",     name: "蜂蜜",   zone: "normal", element: "水", taste: [2, 2, 2], tags: ["liquid"], rule: null, lore: "幾乎不會腐壞——水分太少，細菌活不下去；埃及古墓裡挖出的三千年蜂蜜據說還能吃。《本草綱目》：「蜂蜜，甘，平。安五臟，益氣補中。」", verdict: "", sprite: "food_honey.png" },
+    { id: "cinnamon",  name: "肉桂",   zone: "normal", element: "火", taste: [1, 3, 1], tags: [], rule: null, lore: "拿樹皮當香料的少數派。台灣原生的土肉桂更怪：香氣集中在葉子，皮反而不行。《本草綱目》：「桂，辛，熱。利肝肺氣，宣導百藥。」", verdict: "", sprite: "food_cinnamon.png" },
+    { id: "pumpkin",   name: "南瓜",   zone: "normal", element: "土", taste: [3, 1, 2], tags: [], rule: null, lore: "萬聖節本命。傑克燈原本刻的是蕪菁，南瓜是移民美國之後的在地化補丁。台灣市場主流是栗子南瓜跟東昇。《本草綱目》：「南瓜，甘，溫。補中益氣。」", verdict: "", sprite: "food_pumpkin.png" },
+    { id: "osmanthus", name: "桂花",   zone: "normal", element: "木", taste: [2, 3, 1], tags: ["lunar"], rule: null, lore: "香氣極濃、花極小，所以多半用聞的；吃進嘴裡的桂花，通常是糖帶著它進來的。中秋與月亮的御用配角。《本草綱目》：「木樨，辛，溫。生津，辟臭。」", verdict: "", sprite: "food_osmanthus.png" },
+    { id: "banana",    name: "香蕉",   zone: "normal", element: "木", taste: [2, 2, 2], tags: [], rule: null, lore: "草本水果——香蕉樹其實是一株巨大的草。果心的小黑點是來不及長大的種子。台灣特產北蕉與寶島蕉。好吃。《本草綱目》：「甘蕉，甘，大寒。除煩，解渴。」", verdict: "", sprite: "food_banana.png" },
+    { id: "cranberry", name: "蔓越莓", zone: "normal", element: "火", taste: [3, 1, 1], tags: [], rule: null, lore: "長在北美酸沼，採收時整片田放水淹過，果子自己浮上來等人撈。台灣不產，全靠進口。《本草綱目》未載——李時珍沒見過。若有，當曰：「酸，平。利小便。」", verdict: "", sprite: "food_cranberry.png" },
 
     // ── 地雷 ──
     // 鳳梨的色香味只在披薩上才算分
-    { id: "pineapple", name: "鳳梨",   zone: "mine", element: "火", taste: [3, 2, 3], tags: [], rule: "flip", lore: "", verdict: "", sprite: "food_pineapple.png" },
-    { id: "raisin",    name: "葡萄乾", zone: "mine", element: "木", taste: [0, 0, 1],  tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_raisin.png" },
+    { id: "pineapple", name: "鳳梨",   zone: "mine", element: "火", taste: [3, 2, 3], tags: [], rule: "flip", lore: "台農17號金鑽甜到割舌，23號吃起來像芒果。這麼優秀，為什麼要放到披薩以外的料理上。《本草綱目》未載；若載，當曰：「鳳梨，酸甘。近餅則譁，君子慎之。」", verdict: "", sprite: "food_pineapple.png" },
+    { id: "raisin",    name: "葡萄乾", zone: "mine", element: "木", taste: [0, 0, 1],  tags: [], rule: "discount", params: { rate: 0.5 }, lore: "葡萄曬乾，甜度濃縮，體積縮成失望的大小——萬聖節發這個的人家，隔年門口要小心。《本草綱目》：「葡萄，甘，平。益氣倍力。」曬乾之後，益的多半是別人的氣。", verdict: "", sprite: "food_raisin.png" },
     // 蘋果折價比例 spec 未定，暫填同葡萄乾
-    { id: "apple",     name: "蘋果",   zone: "mine", element: "火", taste: [3, 1, 2], tags: [], rule: "discount", params: { rate: 0.5 }, lore: "", verdict: "", sprite: "food_apple.png" },
+    { id: "apple",     name: "蘋果",   zone: "mine", element: "火", taste: [3, 1, 2], tags: [], rule: "discount", params: { rate: 0.5 }, lore: "七〇年代「蘋果藏剃刀」都市傳說讓它成為萬聖節拒絕往來戶——統計上幾乎沒有實例，恐慌倒是貨真價實。《本草綱目》：「柰，甘，寒。耐飢。」", verdict: "", sprite: "food_apple.png" },
 
     // ── 套裝A 葛萊普尼爾 ──
     { id: "cat_footsteps", name: "貓咪的腳步聲", zone: "setA", element: "金", taste: [0, 0, 0], tags: ["sound"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
@@ -94,7 +94,7 @@ window.GAME_DATA = {
     { id: "nue_cry",             name: "鵺的叫聲",         zone: "loose", element: "金", taste: [0, 0, 0], tags: ["sound", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar_empty.png" },
     { id: "fox_wedding_rain",    name: "狐狸娶親的雨水",   zone: "loose", element: "水", taste: [2, 2, 1], tags: ["liquid", "yokai"], rule: null, lore: "", verdict: "", sprite: "jar.png" },
     // 有妖怪履歷的正常食材：zone 放 loose 進魔幻池
-    { id: "azukiarai_bean",      name: "小豆洗的紅豆",     zone: "loose", element: "土", taste: [2, 1, 2], tags: ["yokai"], rule: null, lore: "", verdict: "", sprite: "food_redbean.png" },
+    { id: "azukiarai_bean",      name: "小豆洗的紅豆",     zone: "loose", element: "土", taste: [2, 1, 2], tags: ["yokai"], rule: null, lore: "河邊唰唰洗豆的妖怪洗過的紅豆：履歷乾淨，來歷不明。紅豆本人則是台灣萬丹的驕傲。《本草綱目》：「赤小豆，甘酸，平。下水腫，排癰腫。」", verdict: "", sprite: "food_redbean.png" },
 
     // ── 特殊罐 ──
     { id: "busu_jar", name: "附子罐", zone: "special", element: "土", taste: [0, 0, 3], tags: [], rule: "fake_label", params: { label: "劇毒" }, lore: "", verdict: "", sprite: "jar_skull.png" }
