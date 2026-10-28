@@ -1,24 +1,28 @@
 // 餵食零韻・萬聖節 Trick or Treat — 遊戲本體
-// 狀態機：title → container（隨機要求＋容器三選一）→ play（抽一樣 → 轉向、選格子放下 → 隨機事件，迴圈）→ result → card
-// 分數 = 色香味星數 × 占格數 × 各種倍率（主位、五行生剋、容器、嫌棄、行情）；不能吃的東西扣味。
+// 狀態機：title → container（隨機要求＋容器三選一）→ play（抽一樣 → 零韻的手左右擺盪，看準時機撒下 → 重力堆疊、同系列相碰合體 → 隨機事件，迴圈）→ result → card
+// 分數 = 色香味星數 × 占格數 × 各種倍率（五行生剋、容器、嫌棄、行情、合體）；不能吃的東西算擺盤裝飾，色加星。
 // 所有文字與數值讀 data.js；這裡只寫規則代號的行為。
 (() => {
   "use strict";
 
   const D = window.GAME_DATA;
   const C = D.config;
-  const N = C.gridSize || 3;
-  const CELLS = N * N;
-  const CENTER = Math.floor(CELLS / 2);
+  const COLS = C.cols || 4, ROWS = C.rows || 4, CELLS = COLS * ROWS;
+  const GAP = 6; // 要跟 style.css 的 .plate / .pieces gap 一致
   const CONTAINERS = D.containers.filter(c => c.enabled !== false);
   const COMBOS = D.combos.filter(c => c.enabled !== false);
   const ENDING = Object.fromEntries(D.endings.map(e => [e.id, e]));
-  const FATAL = ["flip", "instadeath_toxic", "instadeath_mandrake", "fire_rat_ignite"];
+  const FATAL = ["flip", "spill", "instadeath_toxic", "instadeath_mandrake", "fire_rat_ignite"];
   const RARITIES = C.rarities || [{ id: "R", weight: 1, size: 1, starUp: 0, prefix: "" }];
   const RAR_ORDER = RARITIES.map(r => r.id);
   const AXES = ["色", "香", "味"];
   const ZONES = { normal: "正常食材", mine: "地雷", setA: "套裝・葛萊普尼爾", setB: "套裝・竹取五難題", setC: "套裝・飛行軟膏", loose: "散裝魔幻", special: "特殊罐" };
   const ING_BY_ID = Object.fromEntries(D.ingredients.map(i => [i.id, i]));
+  const SET_ZONES = ["setA", "setB", "setC"];
+  const SET_NAME = Object.fromEntries(SET_ZONES.map(z => [z, ZONES[z].replace("套裝・", "")]));
+  // 每個套裝對應的組合技（成員全屬同一區的那個）
+  const SET_COMBO = Object.fromEntries(SET_ZONES.map(z => [z, COMBOS.find(c => c.requires.every(id => ING_BY_ID[id] && ING_BY_ID[id].zone === z))]));
+  const isSetCombo = c => Object.values(SET_COMBO).includes(c);
 
   // 五行：GEN[a] = a 所生；KE[a] = a 所剋
   const GEN = { 木: "火", 火: "土", 土: "金", 金: "水", 水: "木" };
@@ -26,13 +30,14 @@
   const inverse = m => Object.fromEntries(Object.entries(m).map(([a, b]) => [b, a]));
   const GEN_BY = inverse(GEN), KE_BY = inverse(KE);
 
-  // 各尺寸的形狀（列, 欄）與可旋轉的方向
+  // 各尺寸的形狀（列, 欄）；抽到時隨機定一個方向，不能轉
   const SHAPES = {
     1: [[[0, 0]]],
     2: [[[0, 0], [0, 1]], [[0, 0], [1, 0]]],
     3: [[[0, 0], [1, 0], [1, 1]], [[0, 0], [0, 1], [1, 0]], [[0, 0], [0, 1], [1, 1]], [[0, 1], [1, 0], [1, 1]]],
     4: [[[0, 0], [0, 1], [1, 0], [1, 1]]]
   };
+  const shapeW = sh => Math.max(...sh.map(s => s[1])) + 1;
 
   // 材料效果說明（詳情視窗用，由規則代號生成）
   function effectText(ing) {
@@ -41,15 +46,15 @@
     switch (ing.rule) {
       case "flip": parts.push("落盤即掀盤。只有披薩上合法。"); break;
       case "discount": parts.push(`嫌棄傳染：相鄰材料分數 −${Math.round(p.rate * 100)}%。`); break;
-      case "authenticity": parts.push("真贗未明，送餐時揭曉。贗品色香味全無" + (p.fakeEffect === "self_ignite" ? "，而且一放上盤就會燒起來。" : "。")); break;
-      case "toxic_risk": parts.push(`放下時有 ${Math.round(p.chance * 100)}% 機率毒發即死。`); break;
+      case "authenticity": parts.push("真贗未明，送餐時揭曉。贗品色香味全無" + (p.fakeEffect === "self_ignite" ? "，而且一落盤就會燒起來。" : "。")); break;
+      case "toxic_risk": parts.push(`落盤時有 ${Math.round(p.chance * 100)}% 機率毒發即死。`); break;
       case "instadeath": parts.push("送餐時旁邊沒有犬之舌，就會尖叫致死。"); break;
       case "neutralize_once": parts.push("相鄰格的毒或地雷，可以中和一次。"); break;
-      case "immune_once": parts.push("整盤免疫一次失敗。"); break;
+      case "immune_once": parts.push("整盤免疫一次失敗（打翻也擋得住）。"); break;
       case "fake_label": parts.push(`標籤寫著「${p.label || "劇毒"}」。抽到時可以選擇丟掉。`); break;
     }
     if (ing.tags.includes("dog_tongue")) parts.push("裡面好像有犬之舌。");
-    if (ing.tags.includes("inedible")) parts.push(`不能吃：每格味 −${C.inediblePenalty}。`);
+    if (ing.tags.includes("inedible")) parts.push(`不能吃，但很好看：擺盤裝飾，色 +${C.decorBonus} 星。`);
     return parts.join("");
   }
 
@@ -57,9 +62,11 @@
   function comboLines(ing) {
     return COMBOS.filter(c => c.requires.includes(ing.id)).map(c => {
       const others = c.requires.filter(id => id !== ing.id).map(id => (ING_BY_ID[id] || { name: id }).name);
-      const cond = c.requires.length >= 5 ? "同盤" : "相鄰連成一塊";
       const extra = [c.requireGenuine ? "全須真品" : "", c.bonus ? `+${c.bonus} 分` : ""].filter(Boolean).join("，");
-      return `與「${others.join("」「")}」${cond} → ${c.result}${extra ? `（${extra}）` : ""}`;
+      const tail = ` → ${c.result}${extra ? `（${extra}）` : ""}`;
+      if (!isSetCombo(c)) return `與「${others.join("」「")}」相鄰連成一塊${tail}`;
+      if (c.requires.length >= 5) return `同系列相碰就合體；湊齊「${others.join("」「")}」同盤，散落的會自己飛過來${tail}`;
+      return `同系列相碰就合體；跟「${others.join("」「")}」合成一塊${tail}`;
     });
   }
 
@@ -70,6 +77,7 @@
     legend: "這是⋯⋯傳說級的料理。今晚的事，零韻會記一輩子。",
     trick: "⋯⋯不夠。所以，要惡作劇囉。",
     flip: "鑑定：0 分。備註：你知道你做了什麼。",
+    spill: "堆太高了。整盤打翻，地板吃得比我還飽。",
     double_flip: "聚寶盆把鳳梨也複製了。雙倍火葬。",
     rampage: "血條歸零。圖書館今天不營業——你給我站住。",
     instadeath_mandrake: "曼德拉草在盤子上尖叫。零韻聽見了。",
@@ -79,15 +87,13 @@
     pizza: "（死魚眼咀嚼）分數給你。心不給。",
     busu_reveal: "標籤寫劇毒，舔起來是砂糖。主人騙人。",
     eternal_oblivion: "永生了。可是⋯⋯我剛剛吃了什麼？",
-    inedible: name => `${name}⋯⋯咬不動。這不是食物吧。`,
+    decor: name => `${name}⋯⋯不能吃。但擺在盤上，滿好看的。`,
     discount: name => `${name}⋯⋯為什麼要放${name}。`,
     affectionFull: "⋯⋯謝謝你一直餵我。好感度，滿了。",
     nibble: n => `（零韻趁你不注意，偷吃了「${n}」。）`,
-    swap: (a, b) => `盤子晃了一下，「${a}」和「${b}」換了位置。`,
-    slide: (a, i) => `盤子晃了一下，「${a}」滑到第 ${i} 格。`,
+    shake: n => `盤子晃了一下，「${n}」滾到別的地方去了。`,
     fresh: (n, m) => `「${n}」今天特別新鮮，分數 ×${m}。`,
     stale: (n, m) => `「${n}」放久了，分數 ×${m}。`,
-    drop: (n, p) => `「${n}」盤子放不下，掉到地上了。扣 ${p} 分。`,
     request: t => `今晚想吃的是⋯⋯${t}。`
   };
 
@@ -100,6 +106,8 @@
   const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const pts = n => `${Math.round(n)} 分`;
   const fmtMult = m => "×" + (Math.round(m * 100) / 100);
+  const prod = f => f.reduce((a, [, v]) => a * v, 1);
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
   function weighted(list, w) {
     let r = Math.random() * list.reduce((a, x, i) => a + w(x, i), 0);
     for (let i = 0; i < list.length; i++) if ((r -= w(list[i], i)) <= 0) return i;
@@ -115,6 +123,7 @@
       if (v == null || v === false) continue;
       if (k === "class") el.className = v;
       else if (k === "style") el.style.cssText = v;
+      else if (k === "html") el.innerHTML = v;
       else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
       else el.setAttribute(k, v);
     }
@@ -129,29 +138,42 @@
     const full = Math.max(0, Math.min(max, Math.round(n)));
     return h("span", { class: "stars" }, "★".repeat(full), h("span", { class: "dim" }, "☆".repeat(max - full)));
   }
+  const MOUSE = { x: innerWidth / 2, y: innerHeight / 2 };
+  addEventListener("mousemove", e => { MOUSE.x = e.clientX; MOUSE.y = e.clientY; }, { passive: true });
 
   // ── 狀態 ──
   const S = {
     hp: C.maxHp, aff: 0,
     container: null, contName: "", req: null,
-    grid: [], hand: null, rot: 0, eaten: [], dropped: [], deck: [],
+    grid: [], hand: null, eaten: [], dropped: [], deck: [], spilled: null,
     penalty: 0, turn: 0, busy: false, last: null, uid: 0,
-    flags: {}
+    flags: {}, sim: false
   };
 
   // ── 盤面查詢 ──
   const live = x => !!x && !x.vanished;
   const liveItems = () => [...new Set(S.grid.filter(live))];
   const allItems = () => [...new Set(S.grid.filter(Boolean))];
-  const full = () => S.grid.every(Boolean);
-  const onPlate = id => liveItems().find(x => x.ing.id === id);
-  const rc = i => [Math.floor(i / N), i % N];
+  const isGroup = x => !!x.members;
+  const members = x => x.members || [x];
+  const allMembers = () => liveItems().flatMap(members);
+  const zoneOf = x => isGroup(x) ? x.members[0].ing.zone : x.ing.zone;
+  const holderOf = m => liveItems().find(y => members(y).includes(m)) || m;
+  const onPlate = id => allMembers().find(m => m.ing.id === id && !m.neutralized);
+  const rc = i => [Math.floor(i / COLS), i % COLS];
+  const topFull = () => [...Array(COLS).keys()].every(c => S.grid[c]);
+  // 最高那欄堆到第幾層（0 = 空盤，ROWS = 頂到盤緣）
+  function stackHeight() {
+    let top = ROWS;
+    S.grid.forEach((x, i) => { if (x) top = Math.min(top, rc(i)[0]); });
+    return ROWS - top;
+  }
   function neighbors(i) {
     const [r, c] = rc(i), out = [];
-    if (r > 0) out.push(i - N);
-    if (r < N - 1) out.push(i + N);
+    if (r > 0) out.push(i - COLS);
+    if (r < ROWS - 1) out.push(i + COLS);
     if (c > 0) out.push(i - 1);
-    if (c < N - 1) out.push(i + 1);
+    if (c < COLS - 1) out.push(i + 1);
     return out;
   }
   // 與某材料相鄰的其他材料（多格材料取所有格的鄰格）
@@ -160,15 +182,13 @@
     for (const i of x.cells) for (const n of neighbors(i)) { const y = S.grid[n]; if (live(y) && y !== x) out.add(y); }
     return [...out];
   }
-  // 組合技：2–3 件的小組合要在盤上相鄰（上下左右）連成一塊；5 件以上的大套裝同盤即可
+  // 組合技：套裝看合體後的那一塊；其他小組合要相鄰連成一塊
   function comboDone(c) {
+    const ok = m => !m.neutralized && !(c.requireGenuine && m.fake && m.revealed);
+    if (isSetCombo(c)) return liveItems().some(x => isGroup(x) && c.requires.every(id => x.members.some(m => m.ing.id === id && ok(m))));
     const need = new Set(c.requires);
     const cells = [];
-    S.grid.forEach((x, i) => { if (live(x) && need.has(x.ing.id) && !(c.requireGenuine && x.fake && x.revealed)) cells.push(i); });
-    if (c.requires.length >= 5) {
-      const ids = new Set(cells.map(i => S.grid[i].ing.id));
-      return c.requires.every(id => ids.has(id));
-    }
+    S.grid.forEach((x, i) => { if (live(x) && !isGroup(x) && need.has(x.ing.id) && ok(x)) cells.push(i); });
     const seen = new Set();
     for (const start of cells) {
       if (seen.has(start)) continue;
@@ -182,36 +202,127 @@
     }
     return false;
   }
-  const mandrakeSafe = x => around(x).some(y => y.ing.tags.includes("dog_tongue"));
-  const isLiquid = x => x.ing.tags.includes("liquid") || x.juiced;
+  const ointmentDone = () => { const o = COMBOS.find(c => c.effect === "float"); return !!(o && comboDone(o)); };
+  const mandrakeSafe = x => around(x).some(y => members(y).some(m => m.ing.tags.includes("dog_tongue")));
+  const isLiquid = x => members(x).some(m => m.ing.tags.includes("liquid") || m.juiced);
   const elementOf = x => x.juiced ? "水" : x.ing.element;
   // 標題畫面開圖鑑時還沒選容器
   const cont = () => S.container || { rule: "none", params: {} };
 
-  // 形狀放置：讓指定格落在形狀內、全部在盤內且是空格；找不到回傳 null
-  function placementFor(cell, shape) {
-    const [r, c] = rc(cell);
-    for (const [dr, dc] of shape) {
-      const cells = [];
-      for (const [a, b] of shape) {
-        const rr = r - dr + a, cc = c - dc + b;
-        if (rr < 0 || rr >= N || cc < 0 || cc >= N || S.grid[rr * N + cc]) { cells.length = 0; break; }
-        cells.push(rr * N + cc);
+  // ── 落盤與重力 ──
+  // 形狀從盤子上方掉進第 col 欄，回傳停住時的列（可能是負的＝凸出盤緣）
+  function landingRow(shape, col) {
+    const fits = r => shape.every(([a, b]) => {
+      const R = r + a, Cc = col + b;
+      if (Cc < 0 || Cc >= COLS || R >= ROWS) return false;
+      return R < 0 || !S.grid[R * COLS + Cc];
+    });
+    let r = -(Math.max(...shape.map(s => s[0])) + 1);
+    while (fits(r + 1)) r++;
+    return r;
+  }
+  function placeAt(x, col) {
+    const r = landingRow(x.shape, col);
+    const cells = x.shape.map(([a, b]) => [r + a, col + b]);
+    x.cells = cells.filter(([R]) => R >= 0).map(([R, Cc]) => R * COLS + Cc).sort((a, b) => a - b);
+    x.cells.forEach(i => { S.grid[i] = x; });
+    return x.cells.length < cells.length;
+  }
+  // 懸空的材料整塊往下掉，直到全部站穩；回傳有移動的
+  function settle() {
+    const moved = new Set();
+    for (let any = true; any;) {
+      any = false;
+      for (const x of liveItems().sort((a, b) => Math.max(...b.cells) - Math.max(...a.cells))) {
+        const own = new Set(x.cells);
+        if (!x.cells.every(i => rc(i)[0] + 1 < ROWS && (!S.grid[i + COLS] || own.has(i + COLS)))) continue;
+        x.cells.forEach(i => { S.grid[i] = null; });
+        x.cells = x.cells.map(i => i + COLS);
+        x.cells.forEach(i => { S.grid[i] = x; });
+        moved.add(x); any = true;
       }
-      if (cells.length === shape.length) return cells.sort((p, q) => p - q);
+    }
+    return [...moved];
+  }
+  const bounce = (col, w) => Math.random() < C.bounceChance ? Math.max(0, Math.min(COLS - w, col + pick([-1, 1]))) : col;
+
+  // ── 合體 ──
+  function refreshGroup(g) {
+    const ms = g.members, zone = ms[0].ing.zone, combo = SET_COMBO[zone];
+    const ids = new Set(ms.map(m => m.ing.id));
+    const need = combo ? combo.requires.length : ms.length;
+    const els = {};
+    for (const m of ms) els[elementOf(m)] = (els[elementOf(m)] || 0) + 1;
+    const element = Object.entries(els).sort((a, b) => b[1] - a[1])[0][0];
+    g.combo = combo;
+    g.complete = !!combo && combo.requires.every(id => ids.has(id));
+    g.ing = {
+      id: "group_" + zone, zone, element, rule: null, lore: "", verdict: "",
+      name: g.complete ? combo.result : `${SET_NAME[zone]}（${ids.size}/${need}）`,
+      tags: [...new Set(ms.flatMap(m => m.ing.tags))].filter(t => t !== "inedible" && t !== "toxic")
+    };
+    const best = ms.reduce((a, m) => RAR_ORDER.indexOf(m.rar.id) > RAR_ORDER.indexOf(a.rar.id) ? m : a);
+    g.rar = { id: best.rar.id, size: g.cells.length, prefix: "" };
+    g.stars = [0, 1, 2].map(k => ms.reduce((a, m) => a + (m.fake && m.revealed ? 0 : m.stars[k]), 0));
+    g.revealed = ms.every(m => m.revealed || m.ing.rule !== "authenticity");
+  }
+  // parts 合成一個合體塊；有現成的合體塊就沿用它（uid 不變，動畫才接得上）
+  function groupOf(parts) {
+    const base = parts.find(isGroup);
+    const g = base || { uid: ++S.uid, members: [], cells: [], priceMult: 1, used: false, vanished: false, neutralized: false, dup: false, juiced: false, fake: false, revealed: false };
+    g.members = [...new Set(parts.flatMap(members))];
+    g.cells = [...new Set(parts.flatMap(p => p.cells))].sort((a, b) => a - b);
+    g.cells.forEach(i => { S.grid[i] = g; });
+    refreshGroup(g);
+    return g;
+  }
+  function fuseOnce() {
+    for (const x of liveItems()) {
+      if (x.neutralized || !SET_ZONES.includes(zoneOf(x))) continue;
+      const y = around(x).find(y => !y.neutralized && zoneOf(y) === zoneOf(x));
+      if (y) return groupOf([x, y]);
     }
     return null;
   }
-  const fitsAnywhere = shape => [...Array(CELLS).keys()].some(i => placementFor(i, shape));
-  function allPlacements(shapes) {
-    const out = [], seen = new Set();
-    for (const sh of shapes) for (let i = 0; i < CELLS; i++) {
-      const p = placementFor(i, sh);
-      if (p && !seen.has(p.join())) { seen.add(p.join()); out.push(p); }
+  // 大套裝成員全在盤上時，散落的飛到最大那塊合體
+  function absorbBigSets() {
+    const out = [];
+    for (const [zone, combo] of Object.entries(SET_COMBO)) {
+      if (!combo || combo.requires.length < 5) continue;
+      const holders = liveItems().filter(x => !x.neutralized && zoneOf(x) === zone);
+      const ids = new Set(holders.flatMap(members).filter(m => !m.neutralized).map(m => m.ing.id));
+      if (holders.length < 2 || !combo.requires.every(id => ids.has(id))) continue;
+      const main = holders.sort((a, b) => b.cells.length - a.cells.length)[0];
+      const g = isGroup(main) ? main : groupOf([main]);
+      for (const y of holders) {
+        if (y === main) continue;
+        y.cells.forEach(i => { S.grid[i] = null; });
+        g.members.push(...members(y));
+        out.push({ from: y, to: g });
+      }
+      g.members = [...new Set(g.members)];
+      refreshGroup(g);
     }
     return out;
   }
-  const handShape = () => S.hand.shapes[S.rot % S.hand.shapes.length];
+  // 合體 → 吸收 → 重力，重複到盤面穩定
+  function fuseStep() {
+    const before = new Set(liveItems().filter(x => x.complete).map(x => x.uid));
+    const out = { fused: new Set(), absorbed: [], moved: new Set() };
+    for (let guard = 0; guard < 30; guard++) {
+      let changed = false, g;
+      while ((g = fuseOnce())) { out.fused.add(g); changed = true; }
+      const ab = absorbBigSets();
+      if (ab.length) { out.absorbed.push(...ab); ab.forEach(a => out.fused.add(a.to)); changed = true; }
+      const mv = settle();
+      if (mv.length) { mv.forEach(m => out.moved.add(m)); changed = true; }
+      if (!changed) break;
+    }
+    const alive = new Set(liveItems());
+    out.fused = [...out.fused].filter(g => alive.has(g));
+    out.completed = out.fused.filter(g => g.complete && !before.has(g.uid));
+    return out;
+  }
 
   // ── 零韻的要求 ──
   function rollRequest() {
@@ -235,9 +346,9 @@
       case "none": return "無特效，新手基本款。";
       case "pineapple_legal": return "全場唯一讓鳳梨合法的容器。零韻會吃，但不給心。";
       case "vanish_one": return `盤子自帶 ${c.baseScore} 分；送餐時隨機少一件。`;
-      case "keep_one_on_fail": return "掀盤或即死時，甕底留下一樣材料。";
-      case "need_liquid": return `盤上沒有液體時，每回合扣 ${p.penaltyPerTurn} 分。`;
-      case "duplicate_one": return "送餐時隨機複製一樣材料到空位。複製到什麼，看運氣。";
+      case "keep_one_on_fail": return "掀盤、打翻或即死時，甕底留下一樣材料。";
+      case "need_liquid": return `盤上沒有液體時，每撒一次扣 ${p.penaltyPerTurn} 分。`;
+      case "duplicate_one": return "送餐前隨機複製一樣材料，從上面再撒一次。複製到什麼，看運氣。";
       case "liquid_only": return `液體 ×${p.liquidMultiplier}；其他材料打成果汁（水屬性），分數 ×${C.juiceRate}。`;
       case "witch_bonus": return `魔女系材料 ×${p.witchMultiplier}。`;
       case "flip_half": return "掀盤時損失減半。";
@@ -257,28 +368,46 @@
     }
     return out;
   }
-  // 這樣材料身上所有倍率，[說明, 倍率]
-  function factors(x) {
+  // 材料本身帶的倍率（容器、魔女、行情）；合體塊裡每件各自算
+  function ownFactors(m) {
     const c = cont(), p = c.params || {}, f = [];
-    if (c.rule === "liquid_only") f.push(x.juiced ? ["果汁", C.juiceRate] : ["液體", p.liquidMultiplier || 1]);
-    if (c.rule === "witch_bonus" && x.ing.tags.includes("witch")) f.push(["魔女大釜", p.witchMultiplier || 1]);
-    if (x.priceMult !== 1) f.push([x.priceMult > 1 ? "新鮮" : "放久了", x.priceMult]);
-    if (x.cells.includes(CENTER)) f.push(["主位", C.centerMultiplier]);
+    if (c.rule === "liquid_only") f.push(m.juiced ? ["果汁", C.juiceRate] : ["液體", p.liquidMultiplier || 1]);
+    if (c.rule === "witch_bonus" && m.ing.tags.includes("witch")) f.push(["魔女大釜", p.witchMultiplier || 1]);
+    if (m.priceMult !== 1) f.push([m.priceMult > 1 ? "新鮮" : "放久了", m.priceMult]);
+    return f;
+  }
+  // 位置帶來的倍率（嫌棄、五行、合體）；合體塊整塊算一次
+  function placeFactors(x) {
+    const f = [];
+    if (isGroup(x)) {
+      f.push([`合體 ${x.members.length} 件`, 1 + C.fuseRate * (x.members.length - 1)]);
+      if (x.priceMult !== 1) f.push([x.priceMult > 1 ? "新鮮" : "放久了", x.priceMult]);
+    }
     for (const y of around(x)) if (!y.neutralized && y.ing.rule === "discount") f.push([`被${y.ing.name}嫌棄`, 1 - y.ing.params.rate]);
     for (const r of relations(x)) f.push([`${elementOf(r.y)}${r.kind}${elementOf(x)}（${r.y.ing.name}）`, r.kind === "生" ? 1 + C.wuxing.generate : 1 - C.wuxing.overcome]);
     return f;
   }
+  const factors = x => (isGroup(x) ? [] : ownFactors(x)).concat(placeFactors(x));
   const hiddenStars = x => x.ing.rule === "fake_label" && !x.revealed;
-  // 這樣材料貢獻的 [色, 香, 味] 分數；assumeFake：未揭曉的真贗盲盒先當贗品算
+  const unknownTruth = m => m.ing.rule === "authenticity" && !m.revealed;
+  // 單件材料的 [色, 香, 味]（不含位置倍率）；n＝占幾格
+  function baseAxes(m, assumeFake, n) {
+    if (m.neutralized) return [0, 0, 0];
+    if (m.ing.rule === "flip" && cont().rule !== "pineapple_legal") return [0, 0, 0];
+    if (m.fake && (m.revealed || assumeFake)) return [0, 0, 0];
+    if (assumeFake && unknownTruth(m)) return [0, 0, 0];
+    const s = m.stars.slice();
+    if (m.ing.tags.includes("inedible")) s[0] += C.decorBonus;
+    const f = prod(ownFactors(m));
+    return s.map(v => v * n * f);
+  }
+  // 這樣材料（或合體塊）貢獻的 [色, 香, 味]；assumeFake：未揭曉的真贗盲盒先當贗品算
   function itemAxes(x, assumeFake) {
     if (!live(x) || x.neutralized) return [0, 0, 0];
-    if (x.ing.rule === "flip" && cont().rule !== "pineapple_legal") return [0, 0, 0];
-    const n = x.cells.length || x.rar.size;
-    const m = factors(x).reduce((a, [, v]) => a * v, 1);
-    const fake = x.fake || (assumeFake && x.ing.rule === "authenticity" && !x.revealed);
-    const out = (fake ? [0, 0, 0] : x.stars).map(s => s * n * m);
-    if (x.ing.tags.includes("inedible")) out[2] -= C.inediblePenalty * n;
-    return out;
+    const out = [0, 0, 0];
+    for (const m of members(x)) baseAxes(m, assumeFake, isGroup(x) ? m.rar.size : (x.cells.length || x.rar.size)).forEach((v, k) => { out[k] += v; });
+    const pm = prod(placeFactors(x));
+    return out.map(v => v * pm);
   }
   const itemPoints = (x, assumeFake) => Math.round(itemAxes(x, assumeFake).reduce((a, b) => a + b, 0));
   function score({ hideUnknown = false } = {}) {
@@ -286,16 +415,16 @@
     let unknown = 0;
     for (const x of liveItems()) {
       if (hideUnknown && hiddenStars(x)) { unknown++; continue; }
-      if (hideUnknown && x.ing.rule === "authenticity" && !x.revealed) unknown++;
+      if (hideUnknown && members(x).some(unknownTruth)) unknown++;
       itemAxes(x, hideUnknown).forEach((v, k) => { axes[k] += v; });
     }
     const ax = axes.map(v => Math.round(v));
     const combos = COMBOS.filter(c => c.effect !== "cancel_instadeath" && comboDone(c));
     const bonus = combos.reduce((a, c) => a + (c.bonus || 0), 0);
     const discounts = liveItems().filter(x => !x.neutralized && x.ing.rule === "discount");
-    const inedible = liveItems().filter(x => !x.neutralized && x.ing.tags.includes("inedible"));
-    const total = Math.max(0, ax[0] + ax[1] + ax[2] + (S.container.baseScore || 0) + bonus - S.penalty);
-    return { total, axes: ax, bonus, combos, discounts, inedible, unknown };
+    const decor = liveItems().filter(x => !isGroup(x) && !x.neutralized && x.ing.tags.includes("inedible"));
+    const total = Math.max(0, ax[0] + ax[1] + ax[2] + (cont().baseScore || 0) + bonus - S.penalty);
+    return { total, axes: ax, bonus, combos, discounts, decor, unknown };
   }
   const estimate = () => score({ hideUnknown: true });
 
@@ -309,6 +438,7 @@
 
   let bubbleTimer = 0;
   function say(text, face) {
+    if (S.sim) return;
     if (face) setFace(face);
     if (!text) return;
     const b = $("#bubble");
@@ -317,8 +447,8 @@
     clearTimeout(bubbleTimer);
     bubbleTimer = setTimeout(() => b.classList.remove("show"), 4200);
   }
-  function setFace(f) { $("#rein").src = `assets/rein/${FACES.includes(f) ? f : "idle"}.webp`; }
-  function log(t) { $("#log").textContent = t; }
+  function setFace(f) { if (!S.sim) $("#rein").src = `assets/rein/${FACES.includes(f) ? f : "idle"}.webp`; }
+  function log(t) { if (!S.sim) $("#log").textContent = t; }
 
   function jarSvg(ing) {
     const empty = ing.tags.includes("sound");
@@ -334,15 +464,26 @@
   }
 
   const displayName = x => (x.rar.prefix || "") + x.ing.name;
+  function iconEl(x) {
+    const icon = h("div", { class: "tok-icon" });
+    if (isGroup(x)) icon.append(h("div", { class: "seal" + (x.complete ? " done" : "") }, x.complete ? "★" : "合"));
+    else if (x.ing.zone === "normal" || x.ing.zone === "mine") icon.append(h("div", { class: "seal" }, x.ing.name[0]));
+    else icon.innerHTML = jarSvg(x.ing);
+    return icon;
+  }
 
   function tokMeta(x, inHand) {
     const ing = x.ing;
     if (x.vanished) return { t: "第十枚・消失", cls: "off" };
     if (x.neutralized) return { t: "已中和", cls: "off" };
+    if (isGroup(x)) {
+      const unk = x.members.some(unknownTruth);
+      return { t: (x.complete ? "完成 " : "合體 ") + (unk ? "？" : pts(itemPoints(x))), cls: x.complete ? "done" : "" };
+    }
     if (ing.rule === "fake_label" && !x.revealed) return { t: (ing.params && ing.params.label) || "劇毒", cls: "bad" };
     if (ing.rule === "authenticity" && !x.revealed) return { t: "真贗未明", cls: "warn" };
     if (x.fake) return { t: `贗品 ${pts(itemPoints(x))}`, cls: "bad" };
-    if (ing.rule === "flip") return { t: S.container.rule === "pineapple_legal" ? pts(itemPoints(x)) + "・合法" : "地雷", cls: "bad" };
+    if (ing.rule === "flip") return { t: cont().rule === "pineapple_legal" ? pts(itemPoints(x)) + "・合法" : "地雷", cls: "bad" };
     if (ing.rule === "instadeath") {
       const safe = !inHand && mandrakeSafe(x);
       return { t: safe ? "已處理" : "尖叫中", cls: safe ? "" : "bad" };
@@ -354,18 +495,15 @@
   }
   function token(x, inHand) {
     const meta = tokMeta(x, inHand);
-    const icon = h("div", { class: "tok-icon" });
-    if (x.ing.zone === "normal" || x.ing.zone === "mine") icon.append(h("div", { class: "seal" }, x.ing.name[0]));
-    else icon.innerHTML = jarSvg(x.ing);
-    const big = inHand || x.cells.length >= 2;
+    const big = inHand || new Set(x.cells.map(i => rc(i)[0])).size >= 2;
     const rel = inHand ? [] : relations(x);
     const g = rel.filter(r => r.kind === "生").length, k = rel.filter(r => r.kind === "剋").length;
     return h("div", { class: `tok ${meta.cls}`, onclick: e => { e.stopPropagation(); openInfo(x, inHand); } },
       h("span", { class: "el" }, elementOf(x)),
       g || k ? h("span", { class: "rel" }, g ? h("span", { class: "g" }, "生" + (g > 1 ? g : "")) : null, k ? h("span", { class: "k" }, "剋" + (k > 1 ? k : "")) : null) : null,
-      icon,
+      iconEl(x),
       h("div", { class: "tok-name" }, h("span", { class: "rar " + x.rar.id }, x.rar.id), " ", displayName(x) + (x.juiced ? "汁" : "") + (x.dup ? "（複製）" : "")),
-      big ? h("div", { class: "tok-stars" }, hiddenStars(x) ? "色香味 ？" : x.stars.map((s, i) => AXES[i] + s).join(" ")) : null,
+      big && !isGroup(x) ? h("div", { class: "tok-stars" }, hiddenStars(x) ? "色香味 ？" : x.stars.map((s, i) => AXES[i] + s).join(" ")) : null,
       h("div", { class: "tok-meta" }, meta.t));
   }
   function shapeMini(shape) {
@@ -375,29 +513,51 @@
     for (let a = 0; a < hgt; a++) for (let b = 0; b < w; b++) el.append(h("i", { class: on.has(a * 2 + b) ? "on" : "" }));
     return el;
   }
+  const pieceEls = uid => [...document.querySelectorAll(`#plate .piece[data-uid="${uid}"]`)];
+  const anchorEl = uid => document.querySelector(`#plate .piece[data-uid="${uid}"][data-anchor="1"]`);
 
-  function renderPlate(newUid, flash = []) {
+  // 盤面重畫；opts.drop＝剛撒下的材料（從手的位置掉下來）、opts.pulse＝要閃一下的 uid
+  // 位置有變的材料用 FLIP 從舊位置滑到新位置（重力）
+  function renderPlate(opts = {}) {
+    if (S.sim) return;
+    const before = new Map();
+    document.querySelectorAll("#plate .piece[data-anchor='1']").forEach(el => before.set(el.dataset.uid, el.getBoundingClientRect()));
     const plate = $("#plate");
     plate.textContent = "";
-    const shape = S.hand ? handShape() : null;
+    const height = stackHeight();
     for (let i = 0; i < CELLS; i++) {
-      const open = !!shape && !S.grid[i] && !S.busy && !!placementFor(i, shape);
-      plate.append(h("button", {
-        class: `cell${i === CENTER ? " center" : ""}${open ? " open" : ""}${shape && !S.grid[i] && !open && !S.busy ? " nofit" : ""}`,
-        "data-i": i, "aria-label": `第 ${i + 1} 格`, onclick: () => onPlace(i)
-      }, S.grid[i] ? null : h("span", { class: "num" }, String(i + 1), i === CENTER ? h("small", {}, `主位 ×${C.centerMultiplier}`) : null)));
+      const [r] = rc(i);
+      const danger = r === 0 && !S.grid[i] && S.grid[i + COLS];
+      plate.append(h("div", { class: `cell${r === 0 ? " rim" : ""}${danger ? " danger" : ""}`, "data-i": i }));
     }
-    const layer = h("div", { class: "pieces" });
+    const layer = h("div", { class: "pieces", style: `grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${ROWS},minmax(0,1fr));` });
     for (const x of allItems()) {
+      const meta = tokMeta(x, false);
+      const cls = `piece rar-${x.rar.id} ${meta.cls}${isGroup(x) ? " fused" + (x.complete ? " done" : "") : ""}`;
+      if (isGroup(x)) {
+        // 合體塊形狀不規則：一格一片，相鄰的邊拉齊，名字放在最底下最左邊那格
+        const own = new Set(x.cells);
+        const anchor = x.cells.slice().sort((a, b) => rc(b)[0] - rc(a)[0] || rc(a)[1] - rc(b)[1])[0];
+        for (const i of x.cells) {
+          const [r, c] = rc(i);
+          const t = r > 0 && own.has(i - COLS), b = r < ROWS - 1 && own.has(i + COLS), l = c > 0 && own.has(i - 1), rr = c < COLS - 1 && own.has(i + 1);
+          const half = GAP / 2;
+          const style = `grid-row:${r + 1};grid-column:${c + 1};margin:${t ? -half : 0}px ${rr ? -half : 0}px ${b ? -half : 0}px ${l ? -half : 0}px;` +
+            `border-top-width:${t ? 0 : 1}px;border-right-width:${rr ? 0 : 1}px;border-bottom-width:${b ? 0 : 1}px;border-left-width:${l ? 0 : 1}px;border-radius:0;`;
+          const el = h("div", { class: cls + " part", style, "data-uid": x.uid, "data-anchor": i === anchor ? "1" : "0", onclick: () => openInfo(x) });
+          if (i === anchor) el.append(token(x, false));
+          layer.append(el);
+        }
+        continue;
+      }
       const rs = x.cells.map(i => rc(i)[0]), cs = x.cells.map(i => rc(i)[1]);
       const r0 = Math.min(...rs), c0 = Math.min(...cs), hh = Math.max(...rs) - r0 + 1, ww = Math.max(...cs) - c0 + 1;
-      const meta = tokMeta(x, false);
       let style = `grid-row:${r0 + 1}/span ${hh};grid-column:${c0 + 1}/span ${ww};`;
       const tok = token(x, false);
       const isL = x.cells.length === 3;
       if (isL) {
         // L 形：2×2 外框挖掉一角，內容放在轉角那格
-        const miss = [[0, 0], [0, 1], [1, 0], [1, 1]].find(([a, b]) => !x.cells.includes((r0 + a) * N + c0 + b));
+        const miss = [[0, 0], [0, 1], [1, 0], [1, 1]].find(([a, b]) => !x.cells.includes((r0 + a) * COLS + c0 + b));
         const clip = {
           "0,0": "polygon(50% 0,100% 0,100% 100%,0 100%,0 50%,50% 50%)",
           "0,1": "polygon(0 0,50% 0,50% 50%,100% 50%,100% 100%,0 100%)",
@@ -408,25 +568,79 @@
         tok.style.gridRow = String(2 - miss[0]);
         tok.style.gridColumn = String(2 - miss[1]);
       }
-      const el = h("div", { class: `piece rar-${x.rar.id} ${meta.cls}${x.uid === newUid ? " enter" : ""}${x.cells.some(i => flash.includes(i)) ? " flash" : ""}${isL ? " L" : ""}`, style, "data-uid": x.uid });
+      const el = h("div", { class: cls + (isL ? " L" : ""), style, "data-uid": x.uid, "data-anchor": "1" });
       el.append(tok);
       layer.append(el);
     }
     plate.append(layer);
 
+    // 動畫：剛撒下的從手的高度掉下來；其他有移動的從舊位置滑過去
+    const cellW = (plate.clientWidth - 28 - GAP * (COLS - 1)) / COLS;
+    const wellTop = $("#dropper").getBoundingClientRect().top;
+    const drop = opts.drop;
+    for (const el of layer.querySelectorAll(".piece[data-anchor='1']")) {
+      const uid = el.dataset.uid, now = el.getBoundingClientRect(), parts = pieceEls(uid);
+      if (drop && String(drop.x.uid) === uid) {
+        const dy = now.top - wellTop + 10, dx = (drop.from - drop.col) * (cellW + GAP);
+        const ms = dropMs(now.top - wellTop);
+        const frames = drop.from === drop.col
+          ? [{ transform: `translateY(${-dy}px)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: "translateY(0)", offset: .8 }, { transform: "translateY(-6px) scaleY(.94)", offset: .9 }, { transform: "none" }]
+          : [{ transform: `translate(${dx}px, ${-dy}px)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: `translate(${dx}px, 0)`, offset: .66, easing: "ease-out" }, { transform: `translate(${dx * .45}px, -22px)`, offset: .82, easing: "ease-in" }, { transform: "none", offset: .94 }, { transform: "none" }];
+        parts.forEach(p => p.animate(frames, { duration: ms }));
+        continue;
+      }
+      const old = before.get(uid);
+      if (old && (Math.abs(old.top - now.top) > 2 || Math.abs(old.left - now.left) > 2)) {
+        const f = [{ transform: `translate(${old.left - now.left}px, ${old.top - now.top}px)` }, { transform: "none" }];
+        parts.forEach(p => p.animate(f, { duration: 280, easing: "cubic-bezier(.55,0,1,.6)" }));
+      }
+      if (opts.pulse && opts.pulse.includes(+uid)) {
+        parts.forEach(p => p.animate([{ boxShadow: "0 0 0 0 rgba(201,169,97,.95)", filter: "brightness(1.6)" }, { boxShadow: "0 0 0 12px rgba(201,169,97,0)", filter: "none" }], { duration: 700, easing: "ease-out" }));
+      }
+    }
+
+    renderHand();
+    renderSide(height);
+  }
+  const dropMs = px => Math.round(320 + Math.sqrt(Math.max(0, px)) * 18);
+
+  // 盤子上方的手：吊著手上的材料左右擺盪
+  function renderHand() {
+    const hand = $("#hand");
+    hand.textContent = "";
+    hand.className = "hand";
+    const x = S.hand;
+    const w = x ? shapeW(x.shape) : 1;
+    const width = `calc(${w} * (100% - ${(COLS - 1) * GAP}px) / ${COLS} + ${(w - 1) * GAP}px)`;
+    hand.style.setProperty("--w", width);
+    if (!x) { hand.classList.add("idle"); hand.append(h("span", { class: "hand-item empty" }, S.busy ? "" : "抽一樣")); return; }
+    if (x.swing) hand.style.setProperty("--swing", x.swing + "ms");
+    hand.append(h("span", { class: "hand-item" }, h("span", { class: "rar " + x.rar.id }, x.rar.id), displayName(x) + (x.juiced ? "汁" : ""), shapeMini(x.shape)));
+  }
+  // 手現在對準哪一欄：拿手的左緣跟第一列每一格的左緣比
+  function handColumn(w) {
+    const left = $("#hand").getBoundingClientRect().left;
+    const cells = [...document.querySelectorAll("#plate .cell")].slice(0, COLS);
+    let best = 0, d = Infinity;
+    for (let c = 0; c <= COLS - w; c++) { const dd = Math.abs(cells[c].getBoundingClientRect().left - left); if (dd < d) { d = dd; best = c; } }
+    return best;
+  }
+
+  function renderSide(height) {
     // 手上的材料
     const slot = $("#traySlot"); slot.textContent = "";
     if (S.hand) slot.append(token(S.hand, true));
-    else slot.append(h("span", { class: "tray-empty" }, full() ? "盤子滿了" : "先抽一樣"));
+    else slot.append(h("span", { class: "tray-empty" }, topFull() ? "盤子滿了" : "先抽一樣"));
     $("#tray").classList.toggle("active", !!S.hand);
     const busu = S.hand && S.hand.ing.rule === "fake_label";
     $("#btnDiscard").hidden = !busu;
-    $("#btnRotate").hidden = !S.hand || S.hand.shapes.length < 2;
     const hint = $("#trayHint"); hint.textContent = "";
+    const room = ROWS - height;
     if (S.hand) {
-      const fitsNow = fitsAnywhere(shape);
-      hint.append(`占 ${shape.length} 格`, shapeMini(shape), "　",
-        !fitsNow ? "這個方向放不下，旋轉看看。" : busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯放哪？還是丟掉？` : "放到哪裡？（點格子或按 1–9）");
+      hint.append(`占 ${S.hand.shape.length} 格`, shapeMini(S.hand.shape), "　",
+        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : "看準時機按「撒！」（空白鍵或點盤子）");
+    } else if (S.grid.some(Boolean)) {
+      hint.append(room === 0 ? "最高那欄已經頂到盤緣了，再撒小心打翻。" : room === 1 ? "最高那欄只剩一層就到盤緣。" : `最高那欄離盤緣還有 ${room} 層。`);
     }
     const lore = $("#trayLore");
     lore.textContent = S.hand ? S.hand.ing.lore : "";
@@ -443,39 +657,47 @@
       dish.append(h("span", { class: "ax" + (need ? " need" : "") }, AXES[i] + (need ? `（要 ${S.req.focus.min}）` : "")), h("span", {}),
         h("span", { class: "avg" + (need && v >= S.req.focus.min ? " met" : "") }, pts(v)));
     });
-    const extra = (S.container.baseScore || 0) + est.bonus - S.penalty;
+    const extra = (cont().baseScore || 0) + est.bonus - S.penalty;
     dish.append(h("div", { class: "mult" }, h("span", {}, extra ? `其他 ${extra > 0 ? "+" : ""}${extra}　總分` : "總分"), h("b", {}, est.total + (est.unknown ? "＋？" : ""))));
     const line = $("#comboLine"); line.textContent = "";
     for (const c of est.combos) line.append(h("span", { class: "chip" }, c.result));
+    for (const g of liveItems().filter(x => isGroup(x) && !x.complete)) line.append(h("span", { class: "chip dim" }, g.ing.name));
     for (const x of liveItems()) if (x.ing.rule === "instadeath" && !x.neutralized && mandrakeSafe(x)) line.append(h("span", { class: "chip" }, "曼德拉草已處理"));
     // 飛行軟膏一成立就開始飄
-    const ointment = COMBOS.find(c => c.effect === "float");
-    $("#reinWrap").classList.toggle("float", !!(ointment && comboDone(ointment)));
+    $("#reinWrap").classList.toggle("float", ointmentDone());
   }
 
   function setButtons() {
-    $("#btnDraw").disabled = S.busy || !!S.hand || full() || !S.deck.length;
+    if (S.sim) return;
+    const b = $("#btnDraw");
+    b.textContent = S.hand ? "撒！" : "抽一樣";
+    b.disabled = S.busy || (!S.hand && (topFull() || !S.deck.length));
     $("#btnServe").disabled = S.busy || !!S.hand || !liveItems().length;
   }
 
-  // 放置預覽：滑鼠移到格子上，顯示會占哪幾格
-  function preview(i) {
-    document.querySelectorAll(".cell.preview").forEach(c => c.classList.remove("preview"));
-    if (i == null || !S.hand || S.busy) return;
-    const p = placementFor(i, handShape());
-    if (p) p.forEach(j => { const c = document.querySelector(`.cell[data-i="${j}"]`); if (c) c.classList.add("preview"); });
+  // 盤面上方飄一行字（合體、組合完成）
+  async function popText(text, big) {
+    if (S.sim) return;
+    const el = h("div", { class: "pop" + (big ? " big" : "") }, text);
+    $("#well").append(el);
+    await el.animate(big
+      ? [{ opacity: 0, transform: "translate(-50%,-50%) scale(2.2)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: .18 }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: .8 }, { opacity: 0, transform: "translate(-50%,-70%) scale(1)" }]
+      : [{ opacity: 0, transform: "translate(-50%,-30%)" }, { opacity: 1, transform: "translate(-50%,-50%)", offset: .2 }, { opacity: 1, transform: "translate(-50%,-50%)", offset: .7 }, { opacity: 0, transform: "translate(-50%,-80%)" }],
+      { duration: big ? 1600 : 900, easing: "ease-out" }).finished.catch(() => {});
+    el.remove();
   }
 
   // ── 材料詳情 ──
   const wuxingLine = e => GEN[e] ? `${e}生${GEN[e]}、${e}剋${KE[e]}；怕${KE_BY[e]}剋，喜${GEN_BY[e]}生。` : "";
   function openInfo(x, inHand) {
+    if (isGroup(x)) return openGroupInfo(x);
     const box = $("#infoBox"); box.textContent = "";
     const n = x.cells.length || x.rar.size;
     const axes = itemAxes(x);
     const taste = h("div", { class: "info-taste" });
     x.stars.forEach((s, i) => taste.append(h("span", {}, AXES[i]),
-      hiddenStars(x) ? h("span", { class: "stars" }, "？？？") : h("span", {}, starsEl(s), !inHand && !(x.ing.rule === "authenticity" && !x.revealed) ? `　${pts(axes[i])}` : "")));
-    const f = inHand ? factors(x).filter(([k]) => k === "果汁" || k === "液體" || k === "魔女大釜") : factors(x);
+      hiddenStars(x) ? h("span", { class: "stars" }, "？？？") : h("span", {}, starsEl(s), !inHand && !unknownTruth(x) ? `　${pts(axes[i])}` : "")));
+    const f = inHand ? ownFactors(x).filter(([k]) => k === "果汁" || k === "液體" || k === "魔女大釜") : factors(x);
     const eff = effectText(x.ing);
     box.append(...[
       h("button", { class: "info-close", "aria-label": "關閉", onclick: closeInfo }, "×"),
@@ -484,7 +706,7 @@
       h("div", { class: "info-meta" },
         h("span", {}, "五行 ", h("b", {}, elementOf(x))),
         h("span", {}, "占 ", h("b", {}, n), " 格"),
-        h("span", {}, inHand ? "預估 " : "小計 ", h("b", {}, hiddenStars(x) || (x.ing.rule === "authenticity" && !x.revealed) ? "？" : pts(itemPoints(x))))),
+        h("span", {}, inHand ? "預估 " : "小計 ", h("b", {}, hiddenStars(x) || unknownTruth(x) ? "？" : pts(itemPoints(x))))),
       f.length ? h("div", { class: "info-meta" }, f.map(([k, v]) => h("span", {}, k + " ", h("b", {}, fmtMult(v))))) : null,
       eff ? h("p", { class: "info-effect" }, h("b", {}, "效果　"), eff) : null,
       h("p", { class: "info-effect" }, h("b", {}, "分區　"), ZONES[x.ing.zone] || x.ing.zone),
@@ -493,11 +715,36 @@
       x.ing.lore ? h("p", { class: "info-lore" }, x.ing.lore) : null].filter(Boolean));
     $("#infoModal").hidden = false;
   }
+  function openGroupInfo(g) {
+    const box = $("#infoBox"); box.textContent = "";
+    const combo = g.combo, have = new Set(g.members.map(m => m.ing.id));
+    const missing = combo ? combo.requires.filter(id => !have.has(id)).map(id => ING_BY_ID[id].name) : [];
+    const unk = g.members.some(unknownTruth);
+    const pm = prod(placeFactors(g));
+    const status = g.complete
+      ? `套裝完成：+${combo.bonus} 分。` + (combo.requireGenuine ? "送餐時要全部是真品才算數。" : "")
+      : `同系列相碰就合體，每多一件 +${Math.round(C.fuseRate * 100)}%。還差：${missing.join("、")}。`;
+    box.append(
+      h("button", { class: "info-close", "aria-label": "關閉", onclick: closeInfo }, "×"),
+      h("h3", {}, h("span", { class: "rar " + g.rar.id }, g.rar.id), displayName(g)),
+      h("div", { class: "info-meta" },
+        h("span", {}, "五行 ", h("b", {}, elementOf(g))),
+        h("span", {}, "占 ", h("b", {}, g.cells.length), " 格"),
+        h("span", {}, "小計 ", h("b", {}, unk ? "？" : pts(itemPoints(g))))),
+      h("div", { class: "info-meta" }, placeFactors(g).map(([k, v]) => h("span", {}, k + " ", h("b", {}, fmtMult(v))))),
+      h("p", { class: "info-effect" }, h("b", {}, g.complete ? "完成　" : "合體　"), status),
+      h("ul", { class: "info-members" }, g.members.map(m => h("li", {},
+        h("span", { class: "rar " + m.rar.id }, m.rar.id), " ", displayName(m) + (m.fake && m.revealed ? "（贗品）" : ""),
+        h("b", {}, unknownTruth(m) ? "真贗未明" : pts(baseAxes(m, false, m.rar.size).reduce((a, b) => a + b, 0) * pm))))),
+      g.complete && combo.verdict ? h("p", { class: "info-lore" }, combo.verdict) : null);
+    $("#infoModal").hidden = false;
+  }
   function closeInfo() { $("#infoModal").hidden = true; }
 
   // ── 食材圖鑑（存在 localStorage） ──
   const DEX_KEY = "rein-halloween-dex";
   function recordDex(x) {
+    if (S.sim) return;
     const d = store.get(DEX_KEY, {});
     const e = d[x.ing.id] || { n: 0, best: null };
     e.n++;
@@ -525,7 +772,7 @@
   }
   function openDexInfo(ing, e) {
     const rar = RARITIES.find(r => r.id === e.best) || RARITIES[0];
-    const fake = { uid: 0, ing, rar: RARITIES[0], stars: ing.taste.slice(), shapes: SHAPES[1], cells: [], fake: false, juiced: false, vanished: false, neutralized: false, used: false, dup: false, revealed: true, priceMult: 1 };
+    const fake = { uid: 0, ing, rar: RARITIES[0], stars: ing.taste.slice(), shapes: SHAPES[1], shape: SHAPES[1][0], cells: [], fake: false, juiced: false, vanished: false, neutralized: false, used: false, dup: false, revealed: true, priceMult: 1 };
     openInfo(fake, true);
     $("#infoBox").append(h("p", { class: "info-lore" }, `基本星數（R 品質）。抽過 ${e.n} 次，最高品質 ${rar.id}${rar.prefix ? `（${rar.prefix}${ing.name}）` : ""}。`));
   }
@@ -533,7 +780,7 @@
   // ── 抽卡 ──
   function drawFromDeck() {
     if (!S.deck.length) return null;
-    const setsOn = new Set(liveItems().map(x => x.ing.zone).filter(z => z.startsWith("set")));
+    const setsOn = new Set(allMembers().map(m => m.ing.zone).filter(z => z.startsWith("set")));
     const count = {};
     for (const i of S.deck) count[i.zone] = (count[i.zone] || 0) + 1;
     const idx = weighted(S.deck, i => (C.zoneWeights[i.zone] || 1) / count[i.zone] * (setsOn.has(i.zone) ? C.setBoost : 1));
@@ -550,15 +797,24 @@
   }
   function newItem(ing) {
     const rar = RARITIES[weighted(RARITIES, r => r.weight)];
+    const shapes = SHAPES[rar.size] || SHAPES[1];
     return {
-      uid: ++S.uid, ing, rar, stars: rollStars(ing, rar), shapes: SHAPES[rar.size] || SHAPES[1], cells: [],
+      uid: ++S.uid, ing, rar, stars: rollStars(ing, rar), shapes, shape: pick(shapes), cells: [],
       fake: false, juiced: false, vanished: false, neutralized: false, used: false, dup: false, revealed: false, priceMult: 1
     };
   }
+  function drawItem() {
+    const x = newItem(drawFromDeck());
+    if (x.ing.rule === "authenticity") x.fake = Math.random() < C.fakeChance;
+    if (cont().rule === "liquid_only" && !x.ing.tags.includes("liquid")) x.juiced = true;
+    x.swing = Math.round(C.swingMs * (1 - C.swingJitter + Math.random() * C.swingJitter * 2));
+    recordDex(x);
+    return x;
+  }
 
-  // 護盾：角粉只救相鄰材料（地雷、即死）；鱗片整盤免疫一次（任何失敗）；先用角粉
+  // 護盾：角粉只救相鄰材料（地雷、即死）；鱗片整盤免疫一次（任何失敗，含打翻）；先用角粉
   function useShield(kind, x) {
-    if (kind !== "fire") {
+    if (kind === "mine" || kind === "death") {
       const horn = around(x).find(y => y.ing.rule === "neutralize_once" && !y.used);
       if (horn) { horn.used = true; return horn; }
     }
@@ -567,44 +823,81 @@
     return null;
   }
 
+  // ── 撒下去之後的每一步（遊戲和模擬共用；模擬時 say／render 都不做事） ──
+  // 衝擊：打翻、鳳梨、火鼠裘
+  function impactStep(x, overflow) {
+    if (overflow) {
+      const sh = useShield("spill", x);
+      if (sh) {
+        x.cells.forEach(i => { S.grid[i] = null; });
+        x.cells = [];
+        S.dropped.push(x);
+        say(`盤子差點打翻——${sh.ing.name}護住了，只掉了「${displayName(x)}」。`, "scared");
+        return { saved: true };
+      }
+      return { fatal: { type: "spill", cause: x } };
+    }
+    const ing = x.ing, rule = ing.rule;
+    if (rule === "flip") {
+      if (cont().rule === "pineapple_legal") { say("⋯⋯披薩上的鳳梨。合法。", "deadpan"); return {}; }
+      if (Math.random() < C.hawaiianChance) return { fatal: { type: "hawaiian", cause: x } };
+      const sh = useShield("mine", x);
+      if (sh) { x.neutralized = true; say(`${sh.ing.name}生效，鳳梨被中和了。好險。`, "meh"); return { said: true }; }
+      return { fatal: { type: "flip", cause: x } };
+    }
+    if (rule === "authenticity" && x.fake && ing.params && ing.params.fakeEffect === "self_ignite") {
+      x.revealed = true;
+      const sh = useShield("fire", x);
+      if (sh) { x.neutralized = true; say(`火鼠裘是贗品，燒起來了！${sh.ing.name}護住了整盤。`, "scared"); return { said: true }; }
+      return { fatal: { type: "fire_rat_ignite", cause: x } };
+    }
+    return {};
+  }
+  // 毒性：飛行軟膏完成就免疫
+  function toxicStep(x) {
+    if (x.ing.rule !== "toxic_risk" || x.neutralized) return {};
+    if (ointmentDone()) return { immune: true };
+    if (Math.random() < x.ing.params.chance) {
+      const sh = useShield("death", holderOf(x));
+      if (sh) { x.neutralized = true; if (isGroup(holderOf(x))) refreshGroup(holderOf(x)); say(`${x.ing.name}的毒發作了——${sh.ing.name}擋下來了。`, "scared"); return { said: true }; }
+      return { fatal: { type: "instadeath_toxic", cause: x } };
+    }
+    return { survived: true };
+  }
+  // 一般落盤台詞
+  function placeLine(x) {
+    const ing = x.ing, rule = ing.rule;
+    if (rule === "authenticity") return say(`${ing.name}⋯⋯是真的嗎？反正不能吃。`, "pout");
+    if (rule === "instadeath") return say(mandrakeSafe(x) ? "旁邊有犬之舌——曼德拉草可以安全處理。" : "曼德拉草在尖叫⋯⋯送餐前得讓它旁邊有犬之舌。", mandrakeSafe(x) ? "happy" : "scared");
+    if (ing.tags.includes("dog_tongue") && around(x).some(y => y.ing.rule === "instadeath")) return say("犬之舌！隔壁的曼德拉草安全了。", "happy");
+    if (rule === "discount") return say(`⋯⋯${ing.name}。隔壁的也被嫌棄了。`, "meh");
+    if (rule === "fake_label") return say("真的撒下去了⋯⋯", "scared");
+    if (rule === "neutralize_once") return say(`${ing.name}。隔壁的毒和地雷，它能擋一次。`, "idle");
+    if (rule === "immune_once") return say(`${ing.name}。整盤可以免疫一次。`, "idle");
+    const done = COMBOS.find(c => c.requires.includes(ing.id) && c.effect !== "cancel_instadeath" && comboDone(c));
+    if (done) return say(`⋯⋯！${done.result}！`, "happy");
+    if (ing.tags.includes("inedible")) return say(`${displayName(x)}⋯⋯不能吃，當裝飾吧。`, "meh");
+    const rel = relations(x);
+    const g = rel.filter(r => r.kind === "生"), k = rel.filter(r => r.kind === "剋");
+    if (g.length && !k.length) return say(`${g[0].y.ing.name}的${elementOf(g[0].y)}生${elementOf(x)}，${displayName(x)}更好吃了。`, "happy");
+    if (k.length && !g.length) return say(`${k[0].y.ing.name}的${elementOf(k[0].y)}剋${elementOf(x)}⋯⋯味道被壓下去了。`, "meh");
+    if (ing.zone !== "normal" || x.rar.id !== "R") return say(`${displayName(x)}⋯⋯`, "idle");
+    setFace("idle");
+  }
+
   function onDraw() {
-    if (S.busy || S.hand || full() || !S.deck.length) return;
+    if (S.busy || S.hand || topFull() || !S.deck.length) return;
     S.turn++;
-    const x = newItem(drawFromDeck());
-    if (x.ing.rule === "authenticity") x.fake = Math.random() < C.fakeChance;
-    if (S.container.rule === "liquid_only" && !x.ing.tags.includes("liquid")) x.juiced = true;
-    recordDex(x);
-    const rot = x.shapes.findIndex(sh => fitsAnywhere(sh));
-    const label = `${x.rar.id} ${displayName(x)}${x.juiced ? "（打成果汁）" : ""}`;
-    if (rot < 0) return dropItem(x, label);
+    const x = drawItem();
     S.hand = x;
-    S.rot = rot;
-    log(`抽到「${label}」。`);
+    log(`抽到「${x.rar.id} ${displayName(x)}${x.juiced ? "（打成果汁）" : ""}」。零韻的手開始晃了。`);
     if (x.ing.rule === "fake_label") say("那、那個罐子寫著劇毒⋯⋯", "scared");
     else if (x.ing.rule === "flip") say(x.rar.id === "UR" ? "⋯⋯神級鳳梨。不要。" : "⋯⋯鳳梨。", "angry");
-    else if (x.ing.rule === "instadeath" || x.ing.rule === "toxic_risk") say(`${x.ing.name}⋯⋯小心放。`, "scared");
+    else if (x.ing.rule === "instadeath" || x.ing.rule === "toxic_risk") say(`${x.ing.name}⋯⋯小心撒。`, "scared");
     else if (x.ing.tags.includes("inedible")) say(`${x.ing.name}⋯⋯這個能吃嗎？`, "meh");
     else if (x.rar.id === "UR") say(`${displayName(x)}！`, "happy");
     else setFace("idle");
     renderPlate(); setButtons();
-  }
-
-  // 盤子放不下 → 掉到地上，扣分（不能吃的東西掉了不扣）
-  function dropItem(x, label) {
-    const base = Math.max(0, itemPoints(x));
-    const pen = Math.round(base * (C.dropPenaltyRate || 0));
-    S.penalty += pen;
-    S.dropped.push(x);
-    x.penalty = pen;
-    log(FALLBACK.drop(label, pen));
-    say("⋯⋯掉了。不能吃了。", "pout");
-    afterPlace([]);
-  }
-
-  function onRotate() {
-    if (S.busy || !S.hand || S.hand.shapes.length < 2) return;
-    S.rot = (S.rot + 1) % S.hand.shapes.length;
-    renderPlate();
   }
 
   function onDiscard() {
@@ -612,88 +905,78 @@
     log(`把「${S.hand.ing.name}」丟掉了。`);
     say("丟掉了⋯⋯真的是毒嗎？", "meh");
     S.hand = null;
-    afterPlace([]);
+    afterPlace();
   }
 
-  async function onPlace(i) {
-    if (S.busy || !S.hand || S.grid[i]) return;
-    const cells = placementFor(i, handShape());
-    if (!cells) return;
+  async function onDrop() {
+    if (S.busy || !S.hand) return;
     S.busy = true;
-    const x = S.hand;
+    const x = S.hand, w = shapeW(x.shape);
+    const aim = handColumn(w), col = bounce(aim, w);
+    $("#hand").classList.add("held");
     S.hand = null;
-    x.cells = cells;
-    cells.forEach(j => { S.grid[j] = x; });
+    setButtons();
     if (x.ing.rule === "fake_label") S.flags.busuKept = true;
-    renderPlate(x.uid); setButtons();
-    await sleep(320);
-    const fatal = resolvePlacement(x);
-    if (fatal) return endRound(fatal);
-    await afterPlace(cells);
+    const overflow = placeAt(x, col);
+    renderPlate({ drop: { x, from: aim, col } });
+    const landedTop = x.cells.length ? anchorEl(x.uid) : null;
+    await sleep(landedTop ? dropMs(landedTop.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 60 : 420);
+    if (aim !== col) log(`手一滑，「${displayName(x)}」彈到隔壁那欄。`);
+    else log(`撒下「${displayName(x)}」。`);
+
+    const imp = impactStep(x, overflow);
+    if (imp.fatal) return endRound(imp.fatal);
+    if (imp.saved) { renderPlate(); await sleep(700); return afterPlace(); }
+
+    const fu = fuseStep();
+    if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
+
+    const tox = toxicStep(x);
+    if (tox.fatal) return endRound(tox.fatal);
+
+    const ointment = COMBOS.find(c => c.effect === "float");
+    if (fu.completed.length) {
+      const g = fu.completed[0];
+      say(g.combo === ointment ? (ointment.verdict || "飛行軟膏完成。") : `⋯⋯！${g.combo.result}！`, g.combo === ointment ? "dizzy" : "happy");
+    } else if (tox.immune) say(ointment.verdict || "飛行軟膏完成。", "dizzy");
+    else if (fu.fused.length) say(`合體！${fu.fused[0].ing.name}。`, "happy");
+    else if (tox.survived) say(`${x.ing.name}⋯⋯還好，沒事。`, "scared");
+    else if (!imp.said) placeLine(x);
+    await afterPlace();
   }
 
-  async function afterPlace(flash) {
+  // 合體演出：散落的成員飛向本體、合體塊閃光、完成時大字
+  async function animateFusion(fu) {
+    const ghosts = [];
+    for (const a of fu.absorbed) for (const el of pieceEls(a.from.uid)) ghosts.push({ el: el.cloneNode(true), rect: el.getBoundingClientRect(), to: a.to });
+    renderPlate({ pulse: fu.fused.map(g => g.uid) });
+    const ov = $("#overlay");
+    await Promise.all(ghosts.map(({ el, rect, to }) => {
+      const target = anchorEl(to.uid);
+      if (!target) return null;
+      const t = target.getBoundingClientRect();
+      el.style.cssText += `;position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;margin:0;z-index:55;`;
+      ov.append(el);
+      return el.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${t.left - rect.left}px, ${t.top - rect.top}px) scale(.3)`, opacity: .2 }],
+        { duration: 650, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" }).finished.then(() => el.remove(), () => el.remove());
+    }));
+    if (fu.completed.length) await popText(fu.completed[0].combo.result + "！", true);
+    else if (fu.fused.length) await popText("合體！");
+    else await sleep(300);
+  }
+
+  async function afterPlace() {
     S.busy = true;
-    if (S.container.rule === "need_liquid" && !liveItems().some(isLiquid)) {
+    if (cont().rule === "need_liquid" && !liveItems().some(isLiquid)) {
       S.penalty += S.container.params.penaltyPerTurn;
       log($("#log").textContent + ` 頭皿乾了，扣 ${S.container.params.penaltyPerTurn} 分。`);
     }
-    renderPlate(null, flash);
+    renderPlate();
     await randomEvent();
     S.busy = false;
     renderPlate(); setButtons();
-    if (full()) { log($("#log").textContent + " 盤子滿了，直接送餐。"); await sleep(700); return onServe(); }
+    if (topFull()) { log($("#log").textContent + " 盤子滿到盤緣了，直接送餐。"); await sleep(700); return onServe(); }
     if (!S.deck.length) log("食材櫃空了。只能送餐了。");
-  }
-
-  // 材料放下當下的效果；回傳致命結果或 null
-  function resolvePlacement(x) {
-    const ing = x.ing, rule = ing.rule;
-    if (rule === "flip") {
-      if (S.container.rule === "pineapple_legal") { say("⋯⋯披薩上的鳳梨。合法。", "deadpan"); return null; }
-      if (Math.random() < C.hawaiianChance) return { type: "hawaiian", cause: x };
-      const sh = useShield("mine", x);
-      if (sh) { x.neutralized = true; renderPlate(); say(`${sh.ing.name}生效，鳳梨被中和了。好險。`, "meh"); return null; }
-      return { type: "flip", cause: x };
-    }
-    if (rule === "toxic_risk") {
-      const ointment = COMBOS.find(c => c.effect === "float");
-      if (ointment && comboDone(ointment)) { say(ointment.verdict || "飛行軟膏完成。", "dizzy"); return null; }
-      if (Math.random() < ing.params.chance) {
-        const sh = useShield("death", x);
-        if (sh) { x.neutralized = true; renderPlate(); say(`${ing.name}的毒發作了——${sh.ing.name}擋下來了。`, "scared"); return null; }
-        return { type: "instadeath_toxic", cause: x };
-      }
-      say(`${ing.name}⋯⋯還好，沒事。`, "scared");
-      return null;
-    }
-    if (rule === "authenticity" && x.fake && ing.params && ing.params.fakeEffect === "self_ignite") {
-      x.revealed = true;
-      const sh = useShield("fire", x);
-      if (sh) { x.neutralized = true; renderPlate(); say(`火鼠裘是贗品，燒起來了！${sh.ing.name}護住了整盤。`, "scared"); return null; }
-      return { type: "fire_rat_ignite", cause: x };
-    }
-    if (rule === "authenticity") { say(`${ing.name}⋯⋯是真的嗎？反正不能吃。`, "pout"); return null; }
-    if (rule === "instadeath") {
-      say(mandrakeSafe(x) ? "旁邊有犬之舌——曼德拉草可以安全處理。" : "曼德拉草在尖叫⋯⋯送餐前得讓它旁邊有犬之舌。", mandrakeSafe(x) ? "happy" : "scared");
-      return null;
-    }
-    if (ing.tags.includes("dog_tongue") && around(x).some(y => y.ing.rule === "instadeath")) { say("犬之舌！隔壁的曼德拉草安全了。", "happy"); return null; }
-    if (rule === "discount") { say(`⋯⋯${ing.name}。隔壁的也被嫌棄了。`, "meh"); return null; }
-    if (rule === "fake_label") { say("真的放了⋯⋯", "scared"); return null; }
-    if (rule === "neutralize_once") { say(`${ing.name}。隔壁的毒和地雷，它能擋一次。`, "idle"); return null; }
-    if (rule === "immune_once") { say(`${ing.name}。整盤可以免疫一次。`, "idle"); return null; }
-    const done = COMBOS.find(c => c.requires.includes(ing.id) && c.effect !== "cancel_instadeath" && comboDone(c));
-    if (done) { say(`⋯⋯！${done.result}！`, "happy"); return null; }
-    if (ing.tags.includes("inedible")) { say(`${displayName(x)}⋯⋯這個真的不能吃。`, "meh"); return null; }
-    const rel = relations(x);
-    const g = rel.filter(r => r.kind === "生"), k = rel.filter(r => r.kind === "剋");
-    if (g.length && !k.length) { say(`${g[0].y.ing.name}的${elementOf(g[0].y)}生${elementOf(x)}，${displayName(x)}更好吃了。`, "happy"); return null; }
-    if (k.length && !g.length) { say(`${k[0].y.ing.name}的${elementOf(k[0].y)}剋${elementOf(x)}⋯⋯味道被壓下去了。`, "meh"); return null; }
-    if (x.cells.includes(CENTER)) say(`${displayName(x)}放在主位。`, "idle");
-    else if (ing.zone !== "normal" || x.rar.id !== "R") say(`${displayName(x)}⋯⋯`, "idle");
-    else setFace("idle");
-    return null;
   }
 
   // ── 隨機事件 ──
@@ -701,39 +984,41 @@
     const items = liveItems();
     if (!items.length || !D.events || !D.events.length || Math.random() >= C.eventChance) return;
     const ev = D.events[weighted(D.events, e => e.weight || 1)];
-    let text = "", face = "idle", flash = [];
+    let text = "", face = "idle", pulse = [];
     if (ev.rule === "nibble") {
-      const pool = items.filter(x => !["flip", "instadeath", "fake_label", "toxic_risk"].includes(x.ing.rule) && !x.ing.tags.includes("inedible"));
+      const pool = items.filter(x => !isGroup(x) && !["flip", "instadeath", "fake_label", "toxic_risk"].includes(x.ing.rule) && !x.ing.tags.includes("inedible"));
       if (!pool.length) return;
       const x = pick(pool);
       x.cells.forEach(j => { S.grid[j] = null; });
       S.eaten.push(x);
-      text = ev.text || FALLBACK.nibble(displayName(x)); face = "happy"; flash = x.cells;
-    } else if (ev.rule === "swap") {
-      // 只有單格材料會被晃動：跟另一個單格材料換位，或滑到空格
-      const singles = items.filter(x => x.cells.length === 1);
-      if (!singles.length) return;
-      const a = pick(singles), from = a.cells[0];
-      const targets = [...Array(CELLS).keys()].filter(i => i !== from && (!S.grid[i] || (live(S.grid[i]) && S.grid[i].cells.length === 1)));
-      if (!targets.length) return;
-      const to = pick(targets), b = S.grid[to];
-      S.grid[to] = a; a.cells = [to];
-      S.grid[from] = b || null; if (b) b.cells = [from];
-      text = ev.text || (b ? FALLBACK.swap(displayName(a), displayName(b)) : FALLBACK.slide(displayName(a), to + 1));
-      face = "scared"; flash = [from, to];
+      settle();
+      text = ev.text || FALLBACK.nibble(displayName(x)); face = "happy";
+    } else if (ev.rule === "shake" || ev.rule === "swap") {
+      // 一樣材料被晃起來，從上面隨機一欄重新落下
+      const pool = items.filter(x => !isGroup(x));
+      if (!pool.length) return;
+      const x = pick(pool), old = x.cells;
+      old.forEach(j => { S.grid[j] = null; });
+      const cols = [...Array(COLS - shapeW(x.shape) + 1).keys()].filter(c => landingRow(x.shape, c) >= 0);
+      if (!cols.length) { old.forEach(j => { S.grid[j] = x; }); return; }
+      placeAt(x, pick(cols));
+      settle();
+      text = ev.text || FALLBACK.shake(displayName(x)); face = "scared"; pulse = [x.uid];
     } else if (ev.rule === "price_mult") {
-      const pool = items.filter(x => !x.neutralized && x.ing.rule !== "flip" && !x.ing.tags.includes("inedible"));
+      const pool = items.filter(x => !x.neutralized && x.ing.rule !== "flip" && !(x.ing.tags.includes("inedible")));
       if (!pool.length) return;
       const x = pick(pool), m = ev.params.mult;
       x.priceMult *= m;
       text = ev.text || (m >= 1 ? FALLBACK.fresh(displayName(x), m) : FALLBACK.stale(displayName(x), m));
-      face = m >= 1 ? "happy" : "meh"; flash = x.cells;
+      face = m >= 1 ? "happy" : "meh"; pulse = [x.uid];
     } else return;
     await sleep(450);
     log("✦ " + text);
     say(text, face);
-    renderPlate(null, flash);
-    await sleep(900);
+    renderPlate({ pulse });
+    await sleep(700);
+    const fu = fuseStep();
+    if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
   }
 
   // ── 送餐 ──
@@ -750,20 +1035,25 @@
     }
 
     if (S.container.rule === "duplicate_one") {
-      const src = pick(liveItems());
-      const spots = allPlacements(src.shapes);
-      if (!spots.length) { log(`聚寶盆想複製「${displayName(src)}」，可是盤子放不下。`); await sleep(900); }
+      const pool = liveItems().filter(x => !isGroup(x));
+      const src = pool.length ? pick(pool) : null;
+      const cols = src ? [...Array(COLS - shapeW(src.shape) + 1).keys()].filter(c => landingRow(src.shape, c) >= 0) : [];
+      if (!src) log("聚寶盆找不到能複製的東西。");
+      else if (!cols.length) { log(`聚寶盆想複製「${displayName(src)}」，可是盤子放不下。`); await sleep(900); }
       else {
-        const copy = { ...src, uid: ++S.uid, dup: true, used: false, cells: pick(spots) };
-        copy.cells.forEach(j => { S.grid[j] = copy; });
-        renderPlate(copy.uid);
-        log(`聚寶盆複製了「${displayName(src)}」。`);
+        const copy = { ...src, uid: ++S.uid, dup: true, used: false, cells: [] };
+        const col = pick(cols);
+        placeAt(copy, col);
+        renderPlate({ drop: { x: copy, from: col, col } });
+        log(`聚寶盆複製了「${displayName(src)}」，又撒了一次。`);
         await sleep(900);
         if (src.ing.rule === "flip" && S.container.rule !== "pineapple_legal") {
           const sh = useShield("mine", copy);
           if (sh) { copy.neutralized = true; renderPlate(); say(`又一顆鳳梨⋯⋯${sh.ing.name}擋下來了。`, "meh"); await sleep(900); }
           else return endRound({ type: "flip", cause: copy, double: true });
         }
+        const fu = fuseStep();
+        if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
       }
     }
 
@@ -772,7 +1062,8 @@
       if (v) { v.vanished = true; renderPlate(); log(`一枚、兩枚⋯⋯第十枚。「${displayName(v)}」不見了。`); await sleep(1000); }
     }
 
-    allItems().forEach(x => { x.revealed = true; });
+    allItems().flatMap(members).forEach(m => { m.revealed = true; });
+    allItems().filter(isGroup).forEach(refreshGroup);
     renderPlate();
     await sleep(500);
     await eatAnimation();
@@ -790,6 +1081,7 @@
     closeInfo();
     const c = S.container;
     const fatal = FATAL.includes(res.type);
+    if (res.type === "spill") S.spilled = res.cause;
     const sc = res.sc || score();
     let total = sc.total, kept = null;
     let grade = res.type === "treat" ? gradeOf(sc) : null;
@@ -814,6 +1106,7 @@
     const lines = [];
     const add = t => { if (t && !lines.includes(t)) lines.push(t); };
     const endText = id => (ENDING[id] && ENDING[id].verdict) || FALLBACK[id];
+    const STAMP = { flip: "掀盤", spill: "打翻", fire_rat_ignite: "炎上" };
 
     let face = "idle", stamp = "", stampCls = "", stampZh = false;
     if (rampage) {
@@ -821,8 +1114,8 @@
       face = "angry"; stamp = "暴走"; stampCls = "fail"; stampZh = true;
     } else if (fatal) {
       add(res.double ? FALLBACK.double_flip : endText(res.type));
-      face = res.type === "flip" ? "angry" : res.type === "fire_rat_ignite" ? "scared" : "dizzy";
-      stamp = res.type === "flip" ? "掀盤" : res.type === "fire_rat_ignite" ? "炎上" : "即死";
+      face = res.type === "flip" ? "angry" : res.type === "fire_rat_ignite" ? "scared" : res.type === "spill" ? "cry" : "dizzy";
+      stamp = STAMP[res.type] || "即死";
       stampCls = "fail"; stampZh = true;
     } else if (res.type === "hawaiian") {
       add(endText("hawaiian")); face = "happy"; stamp = "傳說"; stampZh = true;
@@ -843,8 +1136,8 @@
     }
     if (!fatal) {
       for (const d of sc.discounts) add(d.ing.verdict || FALLBACK.discount(d.ing.name));
-      const ined = sc.inedible.filter(x => !x.fake || !x.revealed)[0] || sc.inedible[0];
-      if (ined && !sc.combos.some(cb => cb.requires.includes(ined.ing.id))) add(FALLBACK.inedible(ined.ing.name));
+      const dec = sc.decor.filter(x => !x.fake)[0];
+      if (dec && !sc.combos.some(cb => cb.requires.includes(dec.ing.id))) add(FALLBACK.decor(dec.ing.name));
       if (S.flags.busuKept && onPlate("busu_jar")) add(endText("busu_reveal"));
     }
     const pizza = c.rule === "pineapple_legal" && !fatal;
@@ -858,12 +1151,12 @@
     if (res.type === "hawaiian") chips.push("夏威夷結局");
     if (S.contName !== c.name) chips.push(S.contName);
     if (!fatal && S.flags.busuKept && onPlate("busu_jar")) chips.push("附子罐反轉");
-    if (allItems().some(x => x.rar.id === "UR" && !x.dup)) chips.push("神級食材");
+    if (allItems().flatMap(members).some(m => m.rar.id === "UR" && !m.dup)) chips.push("神級食材");
     if (kept) chips.push(`甕底留下：${displayName(kept)}`);
     if (rampage) chips.push("零韻暴走");
     recordAlbum(chips);
 
-    // Treat / Trick 演出
+    // Treat／Trick 演出：Trick 霸屏演完才進結算畫面
     const treat = !fatal && !!grade;
     let trick = null;
     setFace(face);
@@ -875,7 +1168,9 @@
     } else if (!treat && !fatal) {
       const n = 1 + Math.floor(Math.random() * D.tricks.length);
       trick = D.tricks.find(t => t.id === n) || { id: n, text: "", anim: "" };
-      playTrick(trick);
+      say(lines[0] || "", face);
+      await sleep(700);
+      await playTrick(trick);
     }
     if (rampage) await rampageAnimation();
     renderMeters();
@@ -911,11 +1206,11 @@
     const pieces = [...document.querySelectorAll("#plate .piece:not(.off)")];
     pieces.forEach((t, i) => {
       const r = t.getBoundingClientRect();
-      t.style.transitionDelay = `${i * 60}ms`;
+      t.style.transitionDelay = `${i * 50}ms`;
       t.style.transform = `translate(${target.x - (r.left + r.width / 2)}px, ${target.y - (r.top + r.height / 2)}px) scale(.15)`;
       t.style.opacity = "0";
     });
-    await sleep(500 + pieces.length * 60);
+    await sleep(500 + pieces.length * 50);
     const wrap = $("#reinWrap");
     wrap.classList.add("chew");
     crumbs();
@@ -941,11 +1236,11 @@
   }
   async function fatalAnimation(res) {
     const plate = $("#plate");
-    const label = res.type === "flip" ? (res.double ? "雙倍火葬" : "掀盤！") : res.type === "fire_rat_ignite" ? "炎上！" : "即死！";
-    setFace(res.type === "flip" ? "angry" : res.type === "fire_rat_ignite" ? "scared" : "dizzy");
+    const label = res.type === "flip" ? (res.double ? "雙倍火葬" : "掀盤！") : res.type === "spill" ? "打翻！" : res.type === "fire_rat_ignite" ? "炎上！" : "即死！";
+    setFace(res.type === "flip" ? "angry" : res.type === "fire_rat_ignite" || res.type === "spill" ? "scared" : "dizzy");
     if (res.cause) say(`「${displayName(res.cause)}」——`);
     await sleep(300);
-    plate.classList.add("flipped");
+    plate.classList.add(res.type === "spill" ? "spilled" : "flipped");
     document.querySelectorAll("#plate .piece").forEach(t => {
       t.style.transform = `translate(${(Math.random() - .5) * 500}px, ${-200 - Math.random() * 300}px) rotate(${(Math.random() - .5) * 720}deg)`;
       t.style.opacity = "0";
@@ -955,7 +1250,7 @@
     await sleep(1500);
     $("#app").classList.remove("shake");
     $("#overlay").textContent = "";
-    plate.classList.remove("flipped");
+    plate.classList.remove("flipped", "spilled");
   }
   async function rampageAnimation() {
     const ov = $("#overlay");
@@ -963,19 +1258,207 @@
     await sleep(3300);
     ov.textContent = "";
   }
-  // trick 演出：anim 代號 trick_01..10 對到畫面效果
-  const TRICK_FX = ["fx-shake", "fx-invert", "fx-ghost", "fx-ink", "fx-upside", "fx-blur", "fx-tilt", "fx-ghost", "fx-ink", "fx-invert"];
-  function playTrick(t) {
-    const n = parseInt(String(t.anim).replace(/\D/g, ""), 10) || t.id;
-    const fx = TRICK_FX[(n - 1) % TRICK_FX.length];
-    const body = document.body, ov = $("#overlay");
-    setTimeout(() => {
-      if (fx === "fx-shake") { $("#app").classList.add("shake"); setTimeout(() => $("#app").classList.remove("shake"), 500); }
-      else if (fx === "fx-ghost") { for (let i = 0; i < 4; i++) ov.append(h("div", { class: "ghost", style: `top:${15 + i * 18}vh;animation-delay:${i * .25}s` }, "👻")); }
-      else if (fx === "fx-ink") { for (let i = 0; i < 9; i++) { const s = 60 + Math.random() * 140; ov.append(h("div", { class: "ink", style: `left:${Math.random() * 90}vw;top:${Math.random() * 80}vh;width:${s}px;height:${s}px;animation-delay:${i * .06}s` })); } }
-      else body.classList.add(fx);
-      setTimeout(() => { body.classList.remove(fx); ov.textContent = ""; }, 2200);
-    }, 400);
+
+  // ── Trick：十種霸屏惡作劇，每種 3.5–4.5 秒，keyframe＋停格編排 ──
+  const play = (el, frames, opts) => el.animate(frames, typeof opts === "number" ? { duration: opts, fill: "forwards" } : { fill: "forwards", ...opts }).finished.catch(() => {});
+  function trickCaption(stage, t, at) {
+    return sleep(at).then(() => {
+      const cap = h("div", { class: "trick-cap" }, h("b", {}, `TRICK #${t.id}`), h("span", {}, t.text || "零韻的惡作劇發動了。"));
+      stage.append(cap);
+      play(cap, [{ opacity: 0, transform: "translate(-50%, 30px) scale(.9)" }, { opacity: 1, transform: "translate(-50%, 0) scale(1.05)", offset: .6 }, { opacity: 1, transform: "translate(-50%, 0) scale(1)" }], { duration: 420, easing: "cubic-bezier(.2,1.4,.4,1)" });
+      return cap;
+    });
+  }
+  const YOKAI = [
+    // 提燈妖怪
+    '<svg viewBox="0 0 40 64"><path d="M20 2v6"/><path d="M10 8h20"/><rect x="7" y="10" width="26" height="40" rx="12"/><path d="M8 22h24M7 32h26M8 42h24"/><circle cx="15" cy="25" r="2.6" fill="currentColor"/><path d="M19 37q4 6 8 0" /><path d="M23 39q1 8 -3 12"/><path d="M14 50h12v6H14z"/></svg>',
+    // 唐傘
+    '<svg viewBox="0 0 48 70"><path d="M24 4 4 34h40z"/><path d="M24 4v30M14 34l10-30M34 34 24 4"/><circle cx="24" cy="22" r="3.2" fill="currentColor"/><path d="M24 34v24"/><path d="M24 58q-6 8 0 10"/><path d="M18 28q6 4 12 0"/></svg>',
+    // 鬼火
+    '<svg viewBox="0 0 40 60"><path d="M20 4q14 20 12 34a12 12 0 0 1-24 0Q6 24 20 4z"/><path d="M20 24q6 10 4 16a5 5 0 0 1-10 0q0-6 6-16z" fill="currentColor" opacity=".5"/></svg>',
+    // 狐面
+    '<svg viewBox="0 0 48 52"><path d="M6 4l10 14h16L42 4l2 22q-4 18-20 24Q8 44 4 26z"/><path d="M14 26q4-3 8 0M26 26q4-3 8 0"/><path d="M24 36l-3 4h6z" fill="currentColor"/><path d="M12 14l4 6M36 14l-4 6"/></svg>',
+    // 白布幽靈
+    '<svg viewBox="0 0 44 60"><path d="M6 56V24a16 16 0 0 1 32 0v32l-6-5-5 5-5-5-5 5-5-5z"/><circle cx="16" cy="26" r="2.6" fill="currentColor"/><circle cx="28" cy="26" r="2.6" fill="currentColor"/><path d="M18 36q4 3 8 0"/></svg>'
+  ];
+  const BAT = '<svg viewBox="0 0 64 30"><path d="M32 10q-4-8-8-2-6-6-14-2 2 8-8 10 10 2 12 10 4-6 10-4 3-6 8-6 5 0 8 6 6-2 10 4 2-8 12-10-10-2-8-10-8-4-14 2-4-6-8 2z" fill="#0b0f17" stroke="rgba(201,169,97,.55)" stroke-width="1"/><circle cx="29.5" cy="12" r="1" fill="#c9a961"/><circle cx="34.5" cy="12" r="1" fill="#c9a961"/></svg>';
+  const PUMPKIN = '<svg viewBox="0 0 220 200"><path d="M104 30q-2-18 10-26l8 4q-10 8-8 22z" fill="#5c4a26" stroke="#c9a961" stroke-width="2"/>' +
+    '<ellipse cx="110" cy="112" rx="104" ry="84" fill="#a08448"/><ellipse cx="110" cy="112" rx="62" ry="84" fill="#b39352"/><ellipse cx="110" cy="112" rx="22" ry="84" fill="#c9a961"/>' +
+    '<path d="M8 112q0 72 102 84q102-12 102-84" fill="none" stroke="#6e5a2e" stroke-width="2"/>' +
+    '<g class="glow" fill="#fff1c4"><path d="M52 92l30-6-14 30z"/><path d="M168 92l-30-6 14 30z"/><path d="M110 112l9 18h-18z"/><path d="M48 140q62 44 124 0l-12 6-8-10-10 12-12-10-12 12-12-12-12 10-8-10-10 12-8-8z"/></g></svg>';
+  const CURSOR = '<svg viewBox="0 0 24 34" width="28" height="40"><path d="M2 2v26l7-6 5 11 5-2-5-11h9z" fill="#f5f0e6" stroke="#1a2332" stroke-width="2" stroke-linejoin="round"/></svg>';
+  const SPLAT = '<svg viewBox="0 0 200 200"><path d="M100 18c14 0 12 26 26 28s28-22 38-10-12 30-2 42 36 0 36 16-30 10-30 26 26 26 14 38-30-8-40 4 2 36-14 38-14-28-28-28-24 26-36 16 6-30-6-40-34 6-36-10 26-18 22-32-26-22-14-34 30 6 36-8-6-36 10-40 18 20 26 20 6-26 20-26z" fill="#0d121b" stroke="rgba(201,169,97,.4)" stroke-width="2"/></svg>';
+
+  const TRICKS = {
+    // 停電：全黑，只剩跟著滑鼠走的手電筒；兩秒後零韻從光圈裡冒出來
+    async blackout(st, t) {
+      const dark = h("div", { class: "tk-dark" });
+      const setPos = () => { dark.style.setProperty("--mx", MOUSE.x + "px"); dark.style.setProperty("--my", MOUSE.y + "px"); };
+      setPos();
+      const move = () => setPos();
+      addEventListener("mousemove", move);
+      st.append(dark);
+      play(dark, [{ opacity: 0 }, { opacity: 1, offset: .15 }, { opacity: .15, offset: .3 }, { opacity: 1, offset: .42 }, { opacity: .3, offset: .5 }, { opacity: 1 }], 800);
+      trickCaption(st, t, 1000);
+      await sleep(2300);
+      const peek = h("img", { class: "tk-peek", src: "assets/rein/happy.webp", alt: "", style: `left:${MOUSE.x}px;top:${MOUSE.y}px` });
+      st.append(peek);
+      play(peek, [{ transform: "translate(-50%,-30%) scale(0)" }, { transform: "translate(-50%,-50%) scale(1.15)", offset: .6 }, { transform: "translate(-50%,-50%) scale(1)" }], { duration: 360, easing: "cubic-bezier(.2,1.6,.4,1)" });
+      await sleep(1700);
+      removeEventListener("mousemove", move);
+    },
+    // 百鬼夜行：妖怪隊伍從右邊走到左邊，一跳一跳
+    async parade(st, t) {
+      const veil = h("div", { class: "tk-veil" });
+      st.append(veil);
+      play(veil, [{ opacity: 0 }, { opacity: 1 }], 400);
+      const row = h("div", { class: "tk-parade" });
+      for (let i = 0; i < 11; i++) row.append(h("span", { class: "tk-yokai", style: `height:${70 + (i % 3) * 22}px`, html: YOKAI[i % YOKAI.length] }));
+      st.append(row);
+      trickCaption(st, t, 700);
+      [...row.children].forEach((y, i) => play(y, [{ transform: "translateY(0)" }, { transform: "translateY(-16px)", offset: .3 }, { transform: "translateY(0)", offset: .6 }, { transform: "translateY(0)" }], { duration: 560, iterations: 7, delay: i * 70, fill: "none" }));
+      await play(row, [{ transform: "translateX(100vw)" }, { transform: "translateX(-105%)" }], { duration: 4200, easing: "linear" });
+    },
+    // 繃帶：一條條從兩側纏進來蓋滿畫面，停一下再整片掉下去
+    async bandage(st, t) {
+      const strips = [];
+      for (let i = 0; i < 8; i++) {
+        const r = (i % 2 ? -7 : 7) + (Math.random() * 4 - 2);
+        const s = h("div", { class: "tk-band", style: `top:${i * 13 - 6}vh` });
+        st.append(s); strips.push([s, r]);
+        play(s, [{ transform: `translateX(${i % 2 ? 120 : -120}vw) rotate(${r}deg)` }, { transform: `translateX(${i % 2 ? -3 : 3}vw) rotate(${r}deg)`, offset: .75 }, { transform: `translateX(0) rotate(${r}deg)` }], { duration: 360, delay: i * 140, easing: "ease-out" });
+      }
+      trickCaption(st, t, 1400);
+      await sleep(3100);
+      await Promise.all(strips.map(([s, r], i) => play(s, [{ transform: `rotate(${r}deg)` }, { transform: `translateY(120vh) rotate(${r * 3}deg)` }], { duration: 650, delay: i * 50, easing: "cubic-bezier(.55,0,1,.6)" })));
+    },
+    // 滑鼠綁架：游標被小零韻抓走
+    async cursor(st, t) {
+      document.body.classList.add("tk-nocursor");
+      const x0 = MOUSE.x, y0 = MOUSE.y;
+      const cur = h("div", { class: "tk-cursor", style: `left:${x0}px;top:${y0}px`, html: CURSOR });
+      const thief = h("img", { class: "tk-thief", src: "assets/rein/happy.webp", alt: "", style: `left:0;top:${Math.max(0, y0 - innerHeight * .2)}px` });
+      st.append(cur, thief);
+      trickCaption(st, t, 1300);
+      await play(thief, [{ transform: `translateX(${innerWidth + 50}px)` }, { transform: `translateX(${x0 + 10}px)` }], { duration: 900, easing: "cubic-bezier(.2,.8,.3,1)" });
+      await play(cur, [{ transform: "none" }, { transform: "translateY(-30px) rotate(-25deg)" }], { duration: 220, easing: "ease-out" });
+      await sleep(500);
+      play(thief, [{ transform: `translateX(${x0 + 10}px) scaleX(-1)` }, { transform: `translateX(-40vw) scaleX(-1)` }], { duration: 1300, easing: "cubic-bezier(.6,0,.9,.6)" });
+      await play(cur, [{ transform: "translateY(-30px) rotate(-25deg)" }, { transform: `translate(${-x0 - innerWidth * .3}px, -30px) rotate(-25deg)` }], { duration: 1300, easing: "cubic-bezier(.6,0,.9,.6)" });
+      await sleep(600);
+      document.body.classList.remove("tk-nocursor");
+    },
+    // 掀桌：整個畫面往上翻過去，停在背面，再翻回來
+    async table(st, t) {
+      const slam = h("div", { class: "slam-text" }, "掀桌！");
+      st.append(slam);
+      trickCaption(st, t, 1500);
+      await play($("#app"), [
+        { transform: "none" },
+        { transform: "translateY(-24px) rotate(-4deg)", offset: .1 },
+        { transform: "translateY(-24px) rotate(-4deg)", offset: .18 },
+        { transform: "perspective(1400px) translateY(20px) rotateX(180deg)", offset: .38 },
+        { transform: "perspective(1400px) translateY(20px) rotateX(180deg)", offset: .75 },
+        { transform: "translateY(-12px)", offset: .9 },
+        { transform: "none" }], { duration: 4000, easing: "ease-in-out", fill: "none" });
+    },
+    // 南瓜罩頭：巨大南瓜從天而降，眼睛亮起來，最後被拉回去
+    async pumpkin(st, t) {
+      const pk = h("div", { class: "tk-pumpkin", html: PUMPKIN });
+      st.append(pk);
+      await play(pk, [{ transform: "translate(-50%,-160vh)", easing: "cubic-bezier(.55,0,1,.6)" }, { transform: "translate(-50%,-50%)", offset: .62 }, { transform: "translate(-50%,-46%) scale(1.04,.92)", offset: .74 }, { transform: "translate(-50%,-50%)" }], 900);
+      const glow = pk.querySelector(".glow");
+      play(glow, [{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: .3, offset: .3 }, { opacity: 1, offset: .45 }, { opacity: 1 }], 900);
+      trickCaption(st, t, 300);
+      await sleep(2400);
+      await play(pk, [{ transform: "translate(-50%,-50%)" }, { transform: "translate(-50%,-44%)", offset: .2 }, { transform: "translate(-50%,-170vh)" }], { duration: 700, easing: "ease-in" });
+    },
+    // 蝙蝠群：三波蝙蝠掃過畫面
+    async bats(st, t) {
+      const veil = h("div", { class: "tk-veil" });
+      st.append(veil);
+      play(veil, [{ opacity: 0 }, { opacity: 1 }], 500);
+      trickCaption(st, t, 1500);
+      const flights = [];
+      for (let i = 0; i < 42; i++) {
+        const size = 34 + Math.random() * 56, wave = i % 3;
+        const b = h("span", { class: "tk-bat", style: `top:${Math.random() * 88}vh;width:${size}px`, html: BAT });
+        st.append(b);
+        const dur = 1300 + Math.random() * 700, delay = wave * 900 + Math.random() * 500;
+        play(b.firstChild, [{ transform: "scaleY(1)" }, { transform: "scaleY(.35)", offset: .5 }, { transform: "scaleY(1)" }], { duration: 220, iterations: Infinity });
+        flights.push(play(b, [{ transform: `translate(110vw, 0)` }, { transform: `translate(-20vw, ${(Math.random() - .5) * 30}vh)` }], { duration: dur, delay, easing: "linear" }));
+      }
+      await Promise.all(flights);
+      await sleep(300);
+    },
+    // 墨汁：六團墨一團一團砸上來，然後往下滴
+    async ink(st, t) {
+      const spots = [[8, 10], [52, 4], [70, 40], [22, 46], [46, 62], [80, 74], [4, 72]];
+      spots.forEach(([x, y], i) => {
+        const size = 34 + Math.random() * 16;
+        const s = h("div", { class: "tk-splat", style: `left:${x}vw;top:${y}vh;width:${size}vmax;height:${size}vmax`, html: SPLAT });
+        st.append(s);
+        play(s, [{ transform: "scale(2.6) rotate(0deg)", opacity: 0 }, { transform: `scale(.9) rotate(${i * 40}deg)`, opacity: 1, offset: .6 }, { transform: `scale(1) rotate(${i * 40}deg)`, opacity: 1 }], { duration: 260, delay: i * 220, easing: "ease-out" });
+        const drip = h("div", { class: "tk-drip", style: `left:calc(${x}vw + ${size * .45}vmax);top:calc(${y}vh + ${size * .8}vmax)` });
+        st.append(drip);
+        play(drip, [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 1600, delay: 1500 + i * 120, easing: "ease-in" });
+      });
+      trickCaption(st, t, 1700);
+      await sleep(4100);
+    },
+    // 鬼語：畫面上所有字慢慢變成盧恩符文，停一下再變回來
+    async runes(st, t) {
+      const RUNE = "ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ";
+      const nodes = [];
+      const walker = document.createTreeWalker($("#app"), NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() ? 1 : 2 });
+      while (walker.nextNode()) nodes.push([walker.currentNode, walker.currentNode.nodeValue]);
+      const scramble = frac => nodes.forEach(([n, s]) => { n.nodeValue = [...s].map(ch => ch.trim() && Math.random() < frac ? RUNE[Math.floor(Math.random() * RUNE.length)] : ch).join(""); });
+      try {
+        for (let k = 1; k <= 6; k++) { scramble(k / 6); await sleep(160); }
+        const cap = await trickCaption(st, t, 100);
+        const span = cap.querySelector("span"), text = span.textContent;
+        span.textContent = [...text].map(ch => ch.trim() ? RUNE[Math.floor(Math.random() * RUNE.length)] : ch).join("");
+        await sleep(900);
+        for (let k = 0; k <= text.length; k += 2) { span.textContent = text.slice(0, k) + [...text.slice(k)].map(ch => ch.trim() ? RUNE[Math.floor(Math.random() * RUNE.length)] : ch).join(""); await sleep(45); }
+        span.textContent = text;
+        await sleep(1300);
+      } finally {
+        nodes.forEach(([n, s]) => { n.nodeValue = s; });
+      }
+      await sleep(300);
+    },
+    // 倒立圖書館：整個畫面倒過來，書從書架上掉下來堆在底下
+    async upside(st, t) {
+      const app = $("#app");
+      play(app, [{ transform: "none" }, { transform: "rotate(186deg)", offset: .7 }, { transform: "rotate(180deg)" }], { duration: 700, easing: "ease-in-out" });
+      trickCaption(st, t, 1200);
+      const COLORS = ["#2b211b", "#33271f", "#3d2f24", "#241b16", "#4a3a2a", "#1f2a3c"];
+      for (let i = 0; i < 26; i++) {
+        const w = 18 + Math.random() * 18, hgt = 80 + Math.random() * 70, x = Math.random() * 96;
+        const book = h("div", { class: "tk-book", style: `left:${x}vw;width:${w}px;height:${hgt}px;background:${pick(COLORS)}` });
+        st.append(book);
+        const rot = (Math.random() - .5) * 60, floor = innerHeight - hgt * .6 - Math.random() * 60;
+        play(book, [{ transform: `translateY(-30vh) rotate(0deg)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: `translateY(${floor}px) rotate(${rot}deg)`, offset: .82 }, { transform: `translateY(${floor - 14}px) rotate(${rot}deg)`, offset: .9 }, { transform: `translateY(${floor}px) rotate(${rot}deg)` }], { duration: 900 + Math.random() * 300, delay: 500 + Math.random() * 1600 });
+      }
+      await sleep(3400);
+      await play(app, [{ transform: "rotate(180deg)" }, { transform: "rotate(-6deg)", offset: .75 }, { transform: "none" }], { duration: 600, easing: "ease-in-out", fill: "none" });
+      app.getAnimations().forEach(a => a.cancel());
+    }
+  };
+  const TRICK_ORDER = ["blackout", "parade", "bandage", "cursor", "table", "pumpkin", "bats", "ink", "runes", "upside"];
+  async function playTrick(t) {
+    const name = TRICKS[t.anim] ? t.anim : TRICK_ORDER[(t.id - 1) % TRICK_ORDER.length];
+    const st = h("div", { class: "trick" });
+    document.body.append(st);
+    try {
+      if (REDUCED) { await trickCaption(st, t, 0); await sleep(2600); }
+      else await TRICKS[name](st, t);
+      await play(st, [{ opacity: 1 }, { opacity: 0 }], 350);
+    } finally {
+      st.remove();
+      document.body.classList.remove("tk-nocursor");
+      $("#app").getAnimations().forEach(a => a.cancel());
+    }
   }
 
   // ── 收集冊 ──
@@ -986,6 +1469,7 @@
     "零韻暴走"
   ];
   function recordAlbum(chips) {
+    if (S.sim) return;
     const got = new Set(store.get("rein-halloween-album", []));
     chips.forEach(c => { if (ALBUM.includes(c)) got.add(c); });
     store.set("rein-halloween-album", [...got]);
@@ -998,6 +1482,13 @@
   }
 
   // ── 流程 ──
+  function resetRound(c) {
+    S.container = c;
+    S.contName = c.params && c.params.skinChance && Math.random() < c.params.skinChance ? c.params.skinName : c.name;
+    S.grid = Array(CELLS).fill(null); S.hand = null; S.eaten = []; S.dropped = []; S.spilled = null;
+    S.deck = D.ingredients.slice(); S.penalty = 0; S.turn = 0; S.busy = false;
+    S.flags = { affNoted: S.flags.affNoted };
+  }
   function toContainers() {
     if (S.hp <= 0) { S.hp = C.maxHp; S.aff = 0; S.flags.affNoted = false; }
     renderMeters();
@@ -1021,17 +1512,13 @@
     show("screen-container");
   }
   function startRound(c) {
-    S.container = c;
-    S.contName = c.params && c.params.skinChance && Math.random() < c.params.skinChance ? c.params.skinName : c.name;
-    S.grid = Array(CELLS).fill(null); S.hand = null; S.rot = 0; S.eaten = []; S.dropped = [];
-    S.deck = D.ingredients.slice(); S.penalty = 0; S.turn = 0; S.busy = false;
-    S.flags = { affNoted: S.flags.affNoted };
+    resetRound(c);
     $("#contName").textContent = S.contName;
     $("#contRule").textContent = ruleText(c);
-    log(S.contName !== c.name ? `⋯⋯咦？南瓜盅變成了${S.contName}。好復古。` : `要求：${reqText(S.req)}。盤子不用放滿。`);
-    renderPlate(); setButtons();
-    say(c.rule === "pineapple_legal" ? "⋯⋯披薩啊。" : "開始吧。我等著。", c.rule === "pineapple_legal" ? "deadpan" : "idle");
+    log(S.contName !== c.name ? `⋯⋯咦？南瓜盅變成了${S.contName}。好復古。` : `要求：${reqText(S.req)}。堆過盤緣會打翻，覺得夠了就收手。`);
     show("screen-play");
+    renderPlate(); setButtons();
+    say(c.rule === "pineapple_legal" ? "⋯⋯披薩啊。" : "開始吧。我的手會晃，你自己看著辦。", c.rule === "pineapple_legal" ? "deadpan" : "idle");
   }
 
   // ── 證書 ──
@@ -1043,6 +1530,7 @@
     let n = a ? (b ? `${displayName(a)}佐${displayName(b)}` : displayName(a)) : "空氣";
     n += `・${S.contName}盛裝`;
     if (L.type === "flip") n = `被掀翻的${n}`;
+    else if (L.type === "spill") n = `打翻在地的${n}`;
     else if (L.fatal) n = `來不及上桌的${n}`;
     else if (L.grade === "legend") n = `傳說的${n}`;
     return n;
@@ -1066,13 +1554,14 @@
       else if (L.fatal && x !== L.kept) { p = "—"; off = true; }
       else if (x.ing.rule === "flip" && S.container.rule !== "pineapple_legal") p = L.type === "hawaiian" ? "傳說" : "地雷";
       else p = pts(itemPoints(x));
-      rows.push(row(x, p, off, (x.cells.includes(CENTER) ? "（主位）" : "") + (x === L.kept ? "（甕底）" : "")));
+      rows.push(row(x, p, off, (isGroup(x) ? `（${x.members.length} 件合體）` : "") + (x === L.kept ? "（甕底）" : "")));
     });
     S.eaten.forEach(x => rows.push(row(x, "偷吃", true)));
     S.dropped.forEach(x => rows.push(row(x, "掉落", true)));
+    if (S.spilled && !S.spilled.cells.length) rows.push(row(S.spilled, "打翻", true));
     if (!L.fatal) {
       for (const combo of L.sc.combos) if (combo.bonus) rows.push(h("div", { class: "c-row extra" }, h("span", { class: "n" }, `組合：${combo.result}`), h("span", { class: "p" }, "+" + pts(combo.bonus))));
-      if (S.penalty) rows.push(h("div", { class: "c-row extra" }, h("span", { class: "n" }, S.dropped.length ? "掉落與扣分" : "頭皿乾涸"), h("span", { class: "p" }, "−" + pts(S.penalty))));
+      if (S.penalty) rows.push(h("div", { class: "c-row extra" }, h("span", { class: "n" }, "頭皿乾涸"), h("span", { class: "p" }, "−" + pts(S.penalty))));
       if (S.container.baseScore) rows.push(h("div", { class: "c-row extra" }, h("span", { class: "n" }, `${S.contName}基礎分`), h("span", { class: "p" }, "+" + pts(S.container.baseScore))));
     }
     const listCls = "c-list" + (rows.length > 9 ? " two" : "");
@@ -1130,11 +1619,59 @@
     }
   }
 
+  // ── 數值校準用模擬（網址加 ?debug 才開）：隨機落點、堆到 stop 層就收手 ──
+  function simulate(n = 500, stop = 3) {
+    const keep = { ...S };
+    S.sim = true;
+    const totals = [], out = { n, stop, treat: 0, trick: 0, fatal: {}, other: 0, ratio: [] };
+    for (let k = 0; k < n; k++) {
+      resetRound(pick(CONTAINERS));
+      S.req = rollRequest();
+      let res = null;
+      while (!res && S.deck.length && !topFull() && stackHeight() < stop) {
+        const x = drawItem();
+        if (x.ing.rule === "fake_label" && Math.random() < .5) continue;
+        if (x.ing.rule === "fake_label") S.flags.busuKept = true;
+        const w = shapeW(x.shape), col = bounce(randInt(0, COLS - w), w);
+        const imp = impactStep(x, placeAt(x, col));
+        if (imp.fatal) { res = imp.fatal.type; break; }
+        fuseStep();
+        const tox = toxicStep(x);
+        if (tox.fatal) { res = tox.fatal.type; break; }
+        if (cont().rule === "need_liquid" && !liveItems().some(isLiquid)) S.penalty += S.container.params.penaltyPerTurn;
+      }
+      if (!res) {
+        if (liveItems().some(x => x.ing.rule === "instadeath" && !mandrakeSafe(x))) res = "instadeath_mandrake";
+        else {
+          allItems().flatMap(members).forEach(m => { m.revealed = true; });
+          allItems().filter(isGroup).forEach(refreshGroup);
+          const sc = score();
+          totals.push(sc.total);
+          out.ratio.push(sc.total / S.req.total);
+          res = meets(sc) ? "treat" : "trick";
+        }
+      }
+      if (res === "treat") out.treat++;
+      else if (res === "trick") out.trick++;
+      else out.fatal[res] = (out.fatal[res] || 0) + 1;
+    }
+    Object.assign(S, keep);
+    totals.sort((a, b) => a - b);
+    const q = p => totals[Math.floor((totals.length - 1) * p)];
+    out.totals = { p10: q(.1), p25: q(.25), p50: q(.5), p75: q(.75), p90: q(.9) };
+    out.ratio.sort((a, b) => a - b);
+    out.great = out.ratio.filter(r => r >= C.grades.great).length;
+    out.legend = out.ratio.filter(r => r >= C.grades.legend).length;
+    delete out.ratio;
+    return out;
+  }
+  if (new URLSearchParams(location.search).has("debug")) window.__rein = { simulate, state: S, playTrick };
+
   // ── 綁定 ──
+  $("#plate").style.cssText = `grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${ROWS},minmax(0,1fr));aspect-ratio:${COLS}/${ROWS};`;
   $("#btnStart").onclick = toContainers;
-  $("#btnDraw").onclick = onDraw;
+  $("#btnDraw").onclick = () => (S.hand ? onDrop() : onDraw());
   $("#btnServe").onclick = onServe;
-  $("#btnRotate").onclick = onRotate;
   $("#btnDiscard").onclick = onDiscard;
   $("#btnAgain").onclick = toContainers;
   $("#btnCard").onclick = openCard;
@@ -1144,8 +1681,7 @@
   $("#btnClose").onclick = () => { $("#cardModal").hidden = true; };
   $("#cardModal").onclick = e => { if (e.target.id === "cardModal") $("#cardModal").hidden = true; };
   $("#infoModal").onclick = e => { if (e.target.id === "infoModal") closeInfo(); };
-  $("#plate").addEventListener("mouseover", e => { const c = e.target.closest(".cell"); preview(c ? +c.dataset.i : null); });
-  $("#plate").addEventListener("mouseleave", () => preview(null));
+  $("#well").addEventListener("click", e => { if (S.hand && !e.target.closest(".piece")) onDrop(); });
   const toggleObs = () => document.body.classList.toggle("obs");
   $("#btnObs").onclick = toggleObs;
   if (new URLSearchParams(location.search).has("obs")) document.body.classList.add("obs");
@@ -1153,10 +1689,8 @@
     if (e.target.closest("input, textarea")) return;
     if (e.key === "Escape") { $("#cardModal").hidden = true; $("#dexModal").hidden = true; closeInfo(); return; }
     const playing = !$("#screen-play").hidden && $("#infoModal").hidden && $("#dexModal").hidden;
-    if (playing && e.code === "Space") { e.preventDefault(); onDraw(); }
+    if (playing && e.code === "Space") { e.preventDefault(); if (!e.repeat) (S.hand ? onDrop() : onDraw()); }
     else if (playing && e.code === "Enter") { e.preventDefault(); onServe(); }
-    else if (playing && (e.key === "r" || e.key === "R")) onRotate();
-    else if (playing && /^[1-9]$/.test(e.key) && +e.key <= CELLS) onPlace(+e.key - 1);
     else if (e.key === "t" || e.key === "T") toggleObs();
   });
 

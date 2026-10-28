@@ -37,22 +37,24 @@
       <div class="screen" id="screen-title">
         <p class="eyebrow">Halloween Night · 圖書館餐廳開張</p>
         <h2>今晚，零韻要吃什麼？</h2>
-        <p class="lead">從食材櫃抽材料放上盤子——抽到什麼都得上盤。每局零韻都會開一個要求，覺得夠了就收手送餐：色香味達標，零韻給你 <b>Treat</b>；不夠，就換她 <b>Trick</b>。<br>鳳梨落盤，直接掀盤。</p>
+        <p class="lead">從食材櫃抽一樣，零韻的手在盤子上方晃來晃去，看準時機撒下去——落在哪裡，一半看你、一半看命。每局零韻都會開一個要求，覺得夠了就收手送餐：色香味達標，零韻給你 <b>Treat</b>；不夠，就換她 <b>Trick</b>。<br>堆過盤緣會打翻，鳳梨落盤直接掀盤。</p>
         <button class="btn primary" id="btnStart">開始點餐</button>
         <details class="rules">
           <summary>規則與小提示</summary>
           <ul>
             <li>每局隨機端出三個容器讓你挑，每種容器自帶一條規則。</li>
-            <li>盤子只有九格，不用放滿，隨時可以送餐。抽到什麼都得上盤，你只能決定放哪裡、怎麼轉——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>抽到什麼都得撒下去，你只能挑放手的時機。手一滑還可能彈到隔壁那欄——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>材料會往下掉、一層層堆起來。盤子只有四層，堆過盤緣就整盤打翻；覺得夠了就收手送餐。</li>
             <li>分數就是色香味星數 × 占的格數。每局零韻的要求不一樣，可能是總分，也可能指定「香要夠」。</li>
-            <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高星越多。放不下就會掉到地上，扣分。</li>
+            <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格，形狀方向也是隨機的。品質越高星越多，也越佔位置。</li>
             <li>五行相鄰會互相影響：被相生的 ×1.5，被相剋的 ×0.5。木生火、火生土、土生金、金生水、水生木；木剋土、土剋水、水剋火、火剋金、金剋木。</li>
-            <li>不能吃的東西放上去會扣味。中央是主位 ×2。小組合（2–3 件）的材料要相鄰連成一塊才成立，大套裝（5 件以上）湊齊同盤就算；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
-            <li>每放一格，偶爾會發生意外。超過要求很多，會有大滿足和傳說級。</li>
+            <li>同一套裝的材料一碰到就會合體成一塊，件數越多加成越高；湊齊整套變成特殊料理。大套裝湊齊同盤時，散落的成員會自己飛過去。</li>
+            <li>不能吃的東西當擺盤裝飾，色加星。曼德拉草和馬克白香料包、人魚肉和忘川水要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
+            <li>每撒一次，偶爾會發生意外。超過要求很多，會有大滿足和傳說級；不夠的話，零韻會惡作劇。</li>
             <li>點盤上的材料可以看詳情；抽過的材料會記在食材圖鑑裡（存在這個瀏覽器）。</li>
-            <li>掀盤或即死扣一格血，血條歸零⋯⋯後果自負。</li>
+            <li>掀盤、打翻或即死扣一格血，血條歸零⋯⋯後果自負。</li>
             <li>有些材料湊在一起會發生事情。典故就是提示。</li>
-            <li>快捷鍵：空白鍵抽一樣、R 旋轉、1–9 放到第幾格、Enter 送餐、T 切換透明背景（OBS 用）。</li>
+            <li>快捷鍵：空白鍵抽一樣／撒下去（也可以直接點盤子）、Enter 送餐、T 切換透明背景（OBS 用）。</li>
           </ul>
         </details>
         <div class="album" id="album"></div>
@@ -79,7 +81,10 @@
           </div>
         </div>
         <div class="board">
-          <div class="plate" id="plate"></div>
+          <div class="well" id="well">
+            <div class="dropper" id="dropper"><div class="track"><div class="hand idle" id="hand"></div></div></div>
+            <div class="plate" id="plate"></div>
+          </div>
           <div class="side">
             <div class="tray" id="tray">
               <p class="tray-label">手上的材料</p>
@@ -87,7 +92,6 @@
               <p class="tray-hint" id="trayHint"></p>
               <p class="tray-lore" id="trayLore" hidden></p>
               <div class="tray-btns">
-                <button class="btn small" id="btnRotate" hidden>旋轉 (R)</button>
                 <button class="btn small" id="btnDiscard" hidden>丟掉</button>
               </div>
             </div>
@@ -97,7 +101,7 @@
         </div>
         <p class="log" id="log"></p>
         <div class="actions" id="playActions">
-          <button class="btn primary" id="btnDraw">再抽一樣</button>
+          <button class="btn primary" id="btnDraw">抽一樣</button>
           <button class="btn" id="btnServe">收手送餐</button>
         </div>
       </div>

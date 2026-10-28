@@ -15,7 +15,7 @@
 // tags        liquid 液體（河童皿、骷髏杯看這個）/ sound 聲音系 / witch 魔女系（大釜加成）
 //             toxic 毒物 / yokai 妖怪履歷 / longevity 長生系判詞 / lunar 月見系
 //             highvalue 高價材料 / dog_tongue 含犬之舌（曼德拉草安全處理）
-//             inedible 不能吃：每格 味 −config.inediblePenalty
+//             inedible 不能吃：當擺盤裝飾，色 +config.decorBonus 星
 // 材料 rule   null 無特效（只算色香味）
 //             flip            落盤即掀盤 0 分（鳳梨）
 //             discount        嫌棄傳染：相鄰材料分數 ×(1 − params.rate)，不觸發 trick
@@ -29,8 +29,11 @@
 // 容器 rule   none / pineapple_legal / vanish_one / keep_one_on_fail / need_liquid
 //             duplicate_one / liquid_only / witch_bonus / flip_half
 // combo effect cancel_instadeath / ending / float / collection；bonus = 成立時加的分數
-//             2–3 件組合：材料要在盤上相鄰（上下左右）連成一塊；5 件以上套裝：同盤即可
-// event rule  nibble 零韻偷吃一格 / swap 兩格換位 / price_mult 一樣材料分數 ×params.mult
+//             套裝（setA/B/C）：同系列相碰就合體成一塊，合體塊湊齊全部成員＝完成；5 件以上的大套裝湊齊同盤時，散落的會飛過去
+//             其他組合（曼德拉草、永生）：材料要在盤上相鄰（上下左右）連成一塊
+// event rule  nibble 零韻偷吃一樣 / shake 一樣材料被晃起來重新落下 / price_mult 一樣材料分數 ×params.mult
+// trick anim  blackout 停電 / parade 百鬼夜行 / bandage 繃帶 / cursor 滑鼠綁架 / table 掀桌
+//             pumpkin 南瓜罩頭 / bats 蝙蝠群 / ink 墨汁 / runes 鬼語 / upside 倒立圖書館
 // ────────────────────────────────────────────────
 
 window.GAME_DATA = {
@@ -138,37 +141,38 @@ window.GAME_DATA = {
     { id: "instadeath_mandrake", result: "曼德拉草的尖叫", verdict: "" },
     { id: "instadeath_toxic",  result: "毒發",       verdict: "" },
     { id: "fire_rat_ignite",   result: "火鼠裘自燃", verdict: "" },
+    { id: "spill",             result: "打翻",       verdict: "" },
     { id: "busu_reveal",       result: "附子罐其實是砂糖", verdict: "" }
   ],
 
   // 隨機事件：text 留空時用程式內建的備用句；weight = 抽中權重
   events: [
     { id: "nibble",     rule: "nibble",     weight: 3, text: "" },
-    { id: "swap",       rule: "swap",       weight: 3, text: "" },
+    { id: "shake",      rule: "shake",      weight: 3, text: "" },
     { id: "fresh",      rule: "price_mult", weight: 2, params: { mult: 1.5 }, text: "" },
     { id: "stale",      rule: "price_mult", weight: 2, params: { mult: 0.5 }, text: "" }
   ],
 
   tricks: [
-    { id: 1,  text: "", anim: "trick_01" },
-    { id: 2,  text: "", anim: "trick_02" },
-    { id: 3,  text: "", anim: "trick_03" },
-    { id: 4,  text: "", anim: "trick_04" },
-    { id: 5,  text: "", anim: "trick_05" },
-    { id: 6,  text: "", anim: "trick_06" },
-    { id: 7,  text: "", anim: "trick_07" },
-    { id: 8,  text: "", anim: "trick_08" },
-    { id: 9,  text: "", anim: "trick_09" },
-    { id: 10, text: "", anim: "trick_10" }
+    { id: 1,  anim: "blackout", text: "圖書館停電了。⋯⋯別動，我在你後面。" },
+    { id: 2,  anim: "parade",   text: "今晚的客人不只你一個。大家都說——不夠吃。" },
+    { id: 3,  anim: "bandage",  text: "打包。這盤連同你一起，退回廚房重做。" },
+    { id: 4,  anim: "cursor",   text: "你的滑鼠，我收下了。想要回去？拿好吃的來換。" },
+    { id: 5,  anim: "table",    text: "這不是掀盤。這是掀桌。" },
+    { id: 6,  anim: "pumpkin",  text: "不好吃的人，要戴南瓜頭反省三分鐘。" },
+    { id: 7,  anim: "bats",     text: "蝙蝠們都試吃過了。牠們也說不行。" },
+    { id: 8,  anim: "ink",      text: "鑑定書的墨水打翻了。不小心的。真的。" },
+    { id: 9,  anim: "runes",    text: "ᚾᛟ ᛏᚱᛖᚨᛏ——看不懂嗎？就是不給糖的意思。" },
+    { id: 10, anim: "upside",   text: "把圖書館倒過來搖一搖，看會不會掉出比較好吃的東西。" }
   ],
 
   config: {
     // 零韻每局的隨機要求：總分落在 totalMin–totalMax；focusChance 的機率再加一項「某軸 ≥ focusMin–focusMax」
-    request: { totalMin: 24, totalMax: 42, focusChance: 0.5, focusMin: 9, focusMax: 15 },
+    request: { totalMin: 16, totalMax: 32, focusChance: 0.5, focusMin: 6, focusMax: 11 },
     // 過線後依「總分 ÷ 要求」分級：≥ great 大滿足、≥ legend 傳說級；affection = 各級加的好感度
     grades: { great: 1.6, legend: 2.3, affection: { good: 1, great: 2, legend: 3 } },
     wuxing: { generate: 0.5, overcome: 0.5 },
-    inediblePenalty: 3,    // 不能吃的東西：每格 味 −3
+    decorBonus: 2,         // 不能吃的東西當擺盤裝飾：色 +2 星
     hawaiianChance: 0.01,  // 鳳梨反給傳說級
     fakeChance: 0.5,       // 竹取盲盒抽到贗品的機率
     maxHp: 3,              // 掀盤扣血，歸零觸發 rampage
@@ -185,10 +189,12 @@ window.GAME_DATA = {
       { id: "UR",  weight: 4,  size: 4, starUp: "max", prefix: "神級" }
     ],
     juiceRate: 0.5,         // 骷髏杯把非液體打成果汁，分數 ×0.5
-    dropPenaltyRate: 0.5,   // 盤子放不下掉到地上：扣該材料分數 ×0.5
-    gridSize: 3,            // 盤子 3×3 = 9 格，就是食材上限；放滿自動送餐
-    centerMultiplier: 2,    // 中央主菜位的分數倍率
+    cols: 4, rows: 4,       // 盤子 4 欄 × 4 層；堆過盤緣＝打翻，頂層全滿自動送餐
+    swingMs: 1300,          // 零韻的手從一端擺到另一端的時間（毫秒）
+    swingJitter: 0.3,       // 每次抽卡擺速隨機 ±30%
+    bounceChance: 0.35,     // 撒下時手滑、彈到隔壁欄的機率
+    fuseRate: 0.25,         // 合體塊每多一件，整塊分數 +25%
     containerChoices: 3,    // 每局隨機給幾個容器挑；設 1 = 完全隨機
-    eventChance: 0.18       // 每放一格後觸發隨機事件的機率
+    eventChance: 0.18       // 每撒一次後觸發隨機事件的機率
   }
 };
