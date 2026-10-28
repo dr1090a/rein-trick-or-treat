@@ -530,6 +530,7 @@
       const danger = r === 0 && !S.grid[i] && S.grid[i + COLS];
       plate.append(h("div", { class: `cell${r === 0 ? " rim" : ""}${danger ? " danger" : ""}`, "data-i": i }));
     }
+    plateVersion++;
     const layer = h("div", { class: "pieces", style: `grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${ROWS},minmax(0,1fr));` });
     for (const x of allItems()) {
       const meta = tokMeta(x, false);
@@ -626,6 +627,55 @@
     return best;
   }
 
+  // 落點影子：手擺到哪，盤上就亮出沒手滑的話會落在哪；會凸出盤緣就變紅
+  let ghostKey = "", plateVersion = 0;
+  function ghostTick() {
+    requestAnimationFrame(ghostTick);
+    const x = S.hand;
+    if (!x || S.busy || $("#screen-play").hidden) { if (ghostKey) { paintGhost([], false); ghostKey = ""; } return; }
+    const col = handColumn(shapeW(x.shape)), r = landingRow(x.shape, col);
+    const key = `${plateVersion}|${col}|${r}|${x.shape.join(";")}`;
+    if (key === ghostKey) return;
+    ghostKey = key;
+    const cells = x.shape.map(([a, b]) => [r + a, col + b]);
+    paintGhost(cells.filter(([R]) => R >= 0).map(([R, Cc]) => R * COLS + Cc), cells.some(([R]) => R < 0));
+  }
+  function paintGhost(idx, bad) {
+    document.querySelectorAll("#plate .cell.ghost").forEach(c => c.classList.remove("ghost", "bad"));
+    for (const i of idx) { const c = document.querySelector(`#plate .cell[data-i="${i}"]`); if (c) c.classList.add("ghost", ...(bad ? ["bad"] : [])); }
+  }
+
+  // 旋轉：有機率被兔子撞歪，轉成隨機方向（也可能根本沒轉成）
+  const RABBIT = '<svg viewBox="0 0 64 44"><path d="M10 40q-6-1-4-7 4-12 20-14l12-1q-3-7-1-14 2-4 5 0 2 5 1 11 4-7 8-8 4 0 2 4-3 6-7 9 6 3 7 9 0 6-6 8l-6 1-4 3h-5l1-3h-9l-4 4h-5l2-4z" fill="#f5f0e6" stroke="#1a2332" stroke-width="1.6" stroke-linejoin="round"/><circle cx="51" cy="25" r="1.8" fill="#1a2332"/><path d="M60 29l2 1" stroke="#1a2332" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="31" r="3.4" fill="#f5f0e6" stroke="#1a2332" stroke-width="1.4"/></svg>';
+  async function rabbitBump() {
+    const track = $(".track"), hand = $("#hand");
+    hand.classList.add("held");
+    const tr = track.getBoundingClientRect(), hr = hand.getBoundingClientRect();
+    const fromRight = Math.random() < .5, face = fromRight ? " scaleX(-1)" : "";
+    const hit = hr.left - tr.left + hr.width / 2 - 24, start = fromRight ? tr.width + 40 : -80, end = fromRight ? -100 : tr.width + 60;
+    const rb = h("div", { class: "rabbit", html: RABBIT });
+    track.append(rb);
+    await rb.animate([{ transform: `translateX(${start}px)${face}` }, { transform: `translateX(${hit}px)${face}` }], { duration: 420, easing: "cubic-bezier(.4,0,.9,.7)", fill: "forwards" }).finished.catch(() => {});
+    const tilt = fromRight ? -1 : 1;
+    hand.animate([{ transform: "none" }, { transform: `rotate(${22 * tilt}deg)`, offset: .2 }, { transform: `rotate(${-12 * tilt}deg)`, offset: .5 }, { transform: `rotate(${5 * tilt}deg)`, offset: .75 }, { transform: "none" }], { duration: 620, easing: "ease-out" });
+    await rb.animate([{ transform: `translateX(${hit}px)${face}` }, { transform: `translate(${hit - 18 * tilt}px, -16px)${face} rotate(-14deg)`, offset: .25 }, { transform: `translate(${hit - 30 * tilt}px, 0)${face}`, offset: .45 }, { transform: `translateX(${end}px)${face}` }], { duration: 700, easing: "ease-in", fill: "forwards" }).finished.catch(() => {});
+    rb.remove();
+    hand.classList.remove("held");
+  }
+  async function onRotate() {
+    const x = S.hand;
+    if (S.busy || !x || x.shapes.length < 2) return;
+    const from = x.shapes.indexOf(x.shape), want = x.shapes[(from + 1) % x.shapes.length];
+    if (Math.random() >= C.rabbitChance) { x.shape = want; renderPlate(); setButtons(); return; }
+    S.busy = true; setButtons();
+    say("⋯⋯啊，兔子。", "scared");
+    await rabbitBump();
+    x.shape = pick(x.shapes.filter(s => s !== want));
+    S.busy = false;
+    renderPlate(); setButtons();
+    say(x.shape === x.shapes[from] ? "兔子撞了一下⋯⋯沒轉成。" : "兔子撞了一下，轉歪了。", "meh");
+  }
+
   function renderSide(height) {
     // 手上的材料
     const slot = $("#traySlot"); slot.textContent = "";
@@ -638,7 +688,7 @@
     const room = ROWS - height;
     if (S.hand) {
       hint.append(`占 ${S.hand.shape.length} 格`, shapeMini(S.hand.shape), "　",
-        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : "看準時機按「撒！」（空白鍵或點盤子）");
+        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : "盤上亮起來的就是落點。看準時機按「撒！」（空白鍵或點盤子）");
     } else if (S.grid.some(Boolean)) {
       hint.append(room === 0 ? "最高那欄已經頂到盤緣了，再撒小心打翻。" : room === 1 ? "最高那欄只剩一層就到盤緣。" : `最高那欄離盤緣還有 ${room} 層。`);
     }
@@ -672,6 +722,9 @@
     const b = $("#btnDraw");
     b.textContent = S.hand ? "撒！" : "抽一樣";
     b.disabled = S.busy || (!S.hand && (topFull() || !S.deck.length));
+    const rot = $("#btnRotate");
+    rot.hidden = !S.hand || S.hand.shapes.length < 2;
+    rot.disabled = S.busy;
     $("#btnServe").disabled = S.busy || !!S.hand || !liveItems().length;
   }
 
@@ -1673,6 +1726,7 @@
   $("#btnDraw").onclick = () => (S.hand ? onDrop() : onDraw());
   $("#btnServe").onclick = onServe;
   $("#btnDiscard").onclick = onDiscard;
+  $("#btnRotate").onclick = onRotate;
   $("#btnAgain").onclick = toContainers;
   $("#btnCard").onclick = openCard;
   $("#btnDex").onclick = openDex;
@@ -1691,11 +1745,13 @@
     const playing = !$("#screen-play").hidden && $("#infoModal").hidden && $("#dexModal").hidden;
     if (playing && e.code === "Space") { e.preventDefault(); if (!e.repeat) (S.hand ? onDrop() : onDraw()); }
     else if (playing && e.code === "Enter") { e.preventDefault(); onServe(); }
+    else if (playing && (e.key === "r" || e.key === "R" || e.key === "ArrowUp")) { e.preventDefault(); onRotate(); }
     else if (e.key === "t" || e.key === "T") toggleObs();
   });
 
   // 預載立繪，換表情不閃
   FACES.forEach(f => { const i = new Image(); i.src = `assets/rein/${f}.webp`; });
+  requestAnimationFrame(ghostTick);
   renderMeters();
   renderAlbum();
   say("歡迎光臨。今晚想讓我吃什麼？", "idle");

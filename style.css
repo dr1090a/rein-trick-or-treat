@@ -193,6 +193,11 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 .cell { position: relative; border: 1px dashed var(--gold-line); border-radius: 8px; background: rgba(26,35,50,.55); min-width: 0; min-height: 0; aspect-ratio: 1; }
 .cell.rim { border-top-color: var(--gold-line-strong); }
 .cell.danger { background: rgba(176,80,60,.16); border-color: rgba(176,80,60,.55); }
+/* 落點影子 */
+.cell.ghost { background: repeating-linear-gradient(135deg, rgba(201,169,97,.3) 0 7px, rgba(201,169,97,.08) 7px 14px); border: 1px solid var(--gold); }
+.cell.ghost.bad { background: repeating-linear-gradient(135deg, rgba(176,80,60,.45) 0 7px, rgba(176,80,60,.12) 7px 14px); border-color: var(--brick); }
+.rabbit { position: absolute; left: 0; bottom: 0; width: 50px; z-index: 3; pointer-events: none; }
+.rabbit svg { display: block; width: 100%; height: auto; }
 @keyframes cellFlash { from { box-shadow: 0 0 0 3px var(--gold); } to { box-shadow: 0 0 0 0 transparent; } }
 /* 合體塊：一格一片拼起來，完成的套裝整塊發光 */
 .piece.fused { border-color: var(--gold); background: #283349; }

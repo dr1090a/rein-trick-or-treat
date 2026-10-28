@@ -193,6 +193,7 @@ window.GAME_DATA = {
     swingMs: 1300,          // 零韻的手從一端擺到另一端的時間（毫秒）
     swingJitter: 0.3,       // 每次抽卡擺速隨機 ±30%
     bounceChance: 0.35,     // 撒下時手滑、彈到隔壁欄的機率
+    rabbitChance: 0.3,      // 旋轉時被兔子撞歪的機率（撞歪＝轉成隨機方向，可能沒轉成）
     fuseRate: 0.25,         // 合體塊每多一件，整塊分數 +25%
     containerChoices: 3,    // 每局隨機給幾個容器挑；設 1 = 完全隨機
     eventChance: 0.18       // 每撒一次後觸發隨機事件的機率
