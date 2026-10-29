@@ -51,9 +51,10 @@ h1 { margin: 2px 0 0; font-size: 26px; font-weight: 700; letter-spacing: .06em; 
 #aff { font-family: var(--serif-en); color: var(--gold); font-size: 17px; }
 
 /* ── 版面 ── */
-.layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 24px; padding: 20px 0; }
+.layout { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 24px; padding: 20px 0; align-items: start; }
+/* 舞台固定高度並黏在畫面上：右邊面板變高時零韻不會被拉到畫面外 */
 .stage {
-  position: relative; min-height: 560px; overflow: hidden;
+  position: sticky; top: 16px; height: min(720px, calc(100vh - 150px)); min-height: 560px; overflow: hidden;
   border: 1px solid var(--gold-line);
   background:
     radial-gradient(ellipse at 50% 40%, var(--navy-mid), var(--navy-light) 70%);
@@ -489,12 +490,69 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 .loading { color: var(--cream-dim); }
 .hint { margin: 0; font-size: 12px; color: var(--cream-faint); }
 
+/* ── 夾娃娃機台：鑄鐵面板＋鉚釘，只有按鈕是南瓜橘 ── */
+.deck {
+  position: relative; margin-top: 14px; padding: 16px 22px 14px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  border: 1px solid var(--gold-line-strong); border-radius: 16px 16px 6px 6px;
+  background:
+    radial-gradient(circle, #6b5440 0 2.4px, transparent 3px) left 6px top 6px / 12px 12px no-repeat,
+    radial-gradient(circle, #6b5440 0 2.4px, transparent 3px) right 6px top 6px / 12px 12px no-repeat,
+    radial-gradient(circle, #6b5440 0 2.4px, transparent 3px) left 6px bottom 6px / 12px 12px no-repeat,
+    radial-gradient(circle, #6b5440 0 2.4px, transparent 3px) right 6px bottom 6px / 12px 12px no-repeat,
+    linear-gradient(180deg, #261c33, #151019 72%, #0d0912);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 -3px 0 rgba(0,0,0,.45), 0 10px 22px rgba(0,0,0,.4);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.deck button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; font: inherit; }
+.deck-label { display: flex; flex-direction: column; align-items: center; font-size: 12px; line-height: 1.3; letter-spacing: .16em; color: var(--cream-dim); }
+.deck-label small { font-size: 10px; letter-spacing: .1em; color: var(--cream-faint); }
+
+/* 大圓頂：按下去凹陷，落點 Perfect 時亮起來 */
+.dome {
+  position: relative; justify-self: center; width: 96px; height: 96px; padding: 0; border: 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 60%, #2a1a10, #120c0a 70%); cursor: pointer;
+  box-shadow: 0 0 0 4px #0d0912, 0 0 0 5px var(--gold-line-strong);
+}
+.dome-cap {
+  position: absolute; inset: 7px 7px 13px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 36% 28%, #ffe2a0, var(--gold) 42%, #b8672a 80%);
+  box-shadow: 0 6px 0 #7a3c12, inset 0 -5px 10px rgba(0,0,0,.22);
+  color: var(--navy); font-size: 25px; font-weight: 700; letter-spacing: .04em;
+  transition: transform .05s, box-shadow .05s, filter .15s;
+}
+.dome:active:not(:disabled) .dome-cap, .dome.press .dome-cap { transform: translateY(5px); box-shadow: 0 1px 0 #7a3c12, inset 0 -2px 6px rgba(0,0,0,.3); }
+.dome.hot:not(:disabled) .dome-cap { filter: brightness(1.15); box-shadow: 0 6px 0 #7a3c12, 0 0 26px 6px rgba(232,134,47,.7), inset 0 -5px 10px rgba(0,0,0,.22); }
+.dome.hot.press .dome-cap { box-shadow: 0 1px 0 #7a3c12, 0 0 26px 6px rgba(232,134,47,.7); }
+.dome:disabled { cursor: default; }
+.dome:disabled .dome-cap { filter: grayscale(.75) brightness(.5); }
+
+/* 旋轉鈕 */
+.knob, .lever { justify-self: center; display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 0; border: 0; background: none; cursor: pointer; }
+.knob svg {
+  width: 56px; height: 56px; padding: 14px; border-radius: 50%; color: var(--gold);
+  background: radial-gradient(circle at 40% 32%, #3b2d55, #1e1729 72%);
+  box-shadow: 0 0 0 1px var(--gold-line-strong), 0 4px 0 #0d0912;
+  transition: transform .2s, box-shadow .08s;
+}
+.knob:active:not(:disabled) svg { transform: translateY(3px) rotate(90deg); box-shadow: 0 0 0 1px var(--gold), 0 1px 0 #0d0912; }
+.knob.off { visibility: hidden; }
+.knob:disabled, .lever:disabled { opacity: .35; cursor: default; }
+
+/* 送餐拉桿：長按往下拉，拉到底才送 */
+.lever-slot { position: relative; width: 22px; height: 56px; border-radius: 11px; background: #0d0912; box-shadow: inset 0 0 0 1px var(--gold-line-strong), inset 0 3px 6px rgba(0,0,0,.6); }
+.lever-slot::after { content: ""; position: absolute; left: 3px; right: 3px; top: 3px; height: calc((100% - 6px) * var(--p, 0)); border-radius: 8px; background: rgba(232,134,47,.4); }
+.lever-stick { position: absolute; left: 50%; top: 4px; width: 18px; height: 18px; margin-left: -9px; border-radius: 50%; z-index: 1;
+  background: radial-gradient(circle at 35% 30%, #ffe2a0, var(--gold) 50%, #7a3c12);
+  box-shadow: 0 3px 0 #3e2414; transform: translateY(calc(var(--p, 0) * 30px)); }
+.lever.pull .deck-label { color: var(--gold); }
+
 /* ── 手機 ── */
 @media (max-width: 860px) {
   #app { padding: 14px 16px 10px; }
   h1 { font-size: 21px; }
   .layout { grid-template-columns: 1fr; gap: 14px; padding: 14px 0; }
-  .stage { min-height: 300px; }
+  .stage { position: relative; top: auto; height: auto; min-height: 300px; }
   .rein-wrap img { height: 280px; }
   .panel { padding: 18px 16px; }
   .bubble { font-size: 14px; top: 10px; left: 10px; right: 10px; }
@@ -507,6 +565,8 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
   .combo-line { flex: 1; align-content: flex-start; }
   .tok-name { font-size: 11px; }
   .stamp-big { font-size: 34px; }
+  /* 機台黏在畫面底部，大拇指按得到 */
+  .deck { position: sticky; bottom: 0; z-index: 20; margin: 12px -16px -18px; padding: 14px 26px 18px; border-radius: 18px 18px 0 0; border-bottom: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .rein-wrap img, .rein-wrap.float img { animation: none; }

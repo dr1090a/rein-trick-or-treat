@@ -8,7 +8,7 @@
 // ── 代號表 ──────────────────────────────────────────
 // zone        normal 正常食材 / mine 地雷 / setA 葛萊普尼爾 / setB 竹取五難題
 //             setC 飛行軟膏 / loose 散裝魔幻 / special 特殊罐
-// element     五行：金 木 水 火 土。相鄰時 生 → 被生的一方 ×(1+wuxing.generate)，剋 → 被剋的一方 ×(1−wuxing.overcome)
+// element     五行：金 木 水 火 土。相鄰時 生 → 被生的一方 ×(1+wuxing.generate)；剋 → 被一件剋到會被撞得轉向，被兩件夾剋就散掉（合體塊不受影響）
 //             木生火、火生土、土生金、金生水、水生木；木剋土、土剋水、水剋火、火剋金、金剋木
 // taste       色香味星數 [色, 香, 味]，0–3；稀有度會往上加（見 config.rarities）
 //             分數 = 星數 × 占格數 × 各種倍率，三項加總就是總分
@@ -168,10 +168,10 @@ window.GAME_DATA = {
 
   config: {
     // 零韻每局的隨機要求：總分落在 totalMin–totalMax；focusChance 的機率再加一項「某軸 ≥ focusMin–focusMax」
-    request: { totalMin: 16, totalMax: 32, focusChance: 0.5, focusMin: 6, focusMax: 11 },
+    request: { totalMin: 18, totalMax: 36, focusChance: 0.5, focusMin: 6, focusMax: 11 },
     // 過線後依「總分 ÷ 要求」分級：≥ great 大滿足、≥ legend 傳說級；affection = 各級加的好感度
     grades: { great: 1.6, legend: 2.3, affection: { good: 1, great: 2, legend: 3 } },
-    wuxing: { generate: 0.5, overcome: 0.5 },
+    wuxing: { generate: 0.5 },
     decorBonus: 2,         // 不能吃的東西當擺盤裝飾：色 +2 星
     hawaiianChance: 0.01,  // 鳳梨反給傳說級
     fakeChance: 0.5,       // 竹取盲盒抽到贗品的機率

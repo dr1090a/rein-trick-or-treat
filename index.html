@@ -50,14 +50,14 @@
             <li>材料會往下掉、一層層堆起來。盤子只有四層，堆過盤緣就整盤打翻；覺得夠了就收手送餐。</li>
             <li>分數就是色香味星數 × 占的格數。每局零韻的要求不一樣，可能是總分，也可能指定「香要夠」。</li>
             <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高星越多，也越佔位置。</li>
-            <li>五行相鄰會互相影響：被相生的 ×1.5，被相剋的 ×0.5。木生火、火生土、土生金、金生水、水生木；木剋土、土剋水、水剋火、火剋金、金剋木。</li>
+            <li>五行相鄰會互相影響：被相生的 ×1.5；被一件相剋的會被撞得轉個方向，被兩件夾剋就直接散掉（合體後不怕剋）。木生火、火生土、土生金、金生水、水生木；木剋土、土剋水、水剋火、火剋金、金剋木。</li>
             <li>同一套裝的材料一碰到就會合體成一塊，件數越多加成越高；湊齊整套變成特殊料理。大套裝湊齊同盤時，散落的成員會自己飛過去。</li>
             <li>不能吃的東西當擺盤裝飾，色加星。曼德拉草和馬克白香料包、人魚肉和忘川水要相鄰才成立；角粉只救隔壁格；葡萄乾和蘋果會拖累隔壁。</li>
             <li>每撒一次，偶爾會發生意外。超過要求很多，會有大滿足和傳說級；不夠的話，零韻會惡作劇。</li>
             <li>點盤上的材料可以看詳情；抽過的材料會記在食材圖鑑裡（存在這個瀏覽器）。</li>
             <li>掀盤、打翻或即死扣一格血，血條歸零⋯⋯後果自負。</li>
             <li>有些材料湊在一起會發生事情。典故就是提示。</li>
-            <li>快捷鍵：空白鍵抽一樣／撒下去（也可以直接點盤子）、R 或 ↑ 旋轉、Enter 送餐、T 切換透明背景（OBS 用）。</li>
+            <li>快捷鍵：空白鍵撒下去（滑鼠也可以直接點盤子）、R 或 ↑ 旋轉、Enter 送餐（按鈕要長按）、T 切換透明背景（OBS 用）。</li>
           </ul>
         </details>
         <div class="album" id="album"></div>
@@ -103,10 +103,17 @@
           </div>
         </div>
         <p class="log" id="log"></p>
-        <div class="actions" id="playActions">
-          <button class="btn primary" id="btnDraw">抽一樣</button>
-          <button class="btn" id="btnRotate" hidden>旋轉</button>
-          <button class="btn" id="btnServe">收手送餐</button>
+        <!-- 夾娃娃機台：左旋轉鈕、中間大圓頂「撒！」、右邊送餐拉桿（長按） -->
+        <div class="deck" id="deck">
+          <button class="knob" id="btnRotate" aria-label="旋轉（R）">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M19.5 3.5v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="deck-label">旋轉</span>
+          </button>
+          <button class="dome" id="btnDraw" aria-label="撒（空白鍵）"><span class="dome-cap" id="domeCap">抽</span></button>
+          <button class="lever" id="btnServe" aria-label="收手送餐（長按，或 Enter）">
+            <span class="lever-slot"><span class="lever-stick"></span></span>
+            <span class="deck-label">送餐<small>長按</small></span>
+          </button>
         </div>
       </div>
 

@@ -108,6 +108,9 @@
   const fmtMult = m => "×" + (Math.round(m * 100) / 100);
   const prod = f => f.reduce((a, [, v]) => a * v, 1);
   const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 觸控為主的裝置（手機、平板）：不能點盤子撒，靠機台按鈕；支援的話按下去會震一下（iPhone 瀏覽器不支援）
+  const COARSE = matchMedia("(pointer: coarse)").matches;
+  const buzz = p => { try { if (!S.sim && navigator.vibrate) navigator.vibrate(p); } catch (e) { /* 不支援就算了 */ } };
   function weighted(list, w) {
     let r = Math.random() * list.reduce((a, x, i) => a + w(x, i), 0);
     for (let i = 0; i < list.length; i++) if ((r -= w(list[i], i)) <= 0) return i;
@@ -145,7 +148,7 @@
   const S = {
     hp: C.maxHp, aff: 0,
     container: null, contName: "", req: null,
-    grid: [], hand: null, eaten: [], dropped: [], deck: [], spilled: null,
+    grid: [], hand: null, eaten: [], dropped: [], scattered: [], deck: [], spilled: null,
     penalty: 0, turn: 0, combo: 0, busy: false, last: null, uid: 0,
     flags: {}, sim: false
   };
@@ -245,6 +248,45 @@
     return [...moved];
   }
   const bounce = (col, w) => Math.random() < C.bounceChance ? Math.max(0, Math.min(COLS - w, col + pick([-1, 1]))) : col;
+
+  // ── 五行相剋 ──
+  // 被兩件以上相鄰材料剋到的散掉；只被一件剋到的被撞得轉個方向（合體塊不受影響）
+  // 同一對剋只發作一次；散掉、轉向之後重力讓上面的掉下來，可能接著連鎖
+  function wuxingStep() {
+    const gone = [], turned = [];
+    for (const y of liveItems()) {
+      if (isGroup(y)) continue;
+      const src = relations(y).filter(r => r.kind === "剋").map(r => r.y);
+      const seen = y.keSeen || (y.keSeen = new Set());
+      const fresh = src.filter(s => !seen.has(s.uid));
+      if (!fresh.length) continue;
+      fresh.forEach(s => seen.add(s.uid));
+      if (src.length >= 2) gone.push({ y, src });
+      else turned.push({ y, by: src[0] });
+    }
+    for (const { y } of gone) { y.cells.forEach(i => { S.grid[i] = null; }); y.cells = []; S.scattered.push(y); }
+    for (const t of turned) t.spun = spin(t.y);
+    return { gone, turned, moved: settle() };
+  }
+  // 原地轉成別的方向：底部對齊、優先留在原欄，卡住就轉不動
+  function spin(y) {
+    const others = shuffle(y.shapes.filter(s => s !== y.shape));
+    const rs = y.cells.map(i => rc(i)[0]), cs = y.cells.map(i => rc(i)[1]);
+    const bottom = Math.max(...rs), c0 = Math.min(...cs), own = new Set(y.cells);
+    for (const s of others) {
+      const top = bottom - Math.max(...s.map(p => p[0])), ws = shapeW(s);
+      for (const col of [c0, ...shuffle([c0 - 1, c0 + 1])]) {
+        if (col < 0 || col + ws > COLS || top < 0) continue;
+        const cells = s.map(([a, b]) => (top + a) * COLS + col + b);
+        if (cells.some(i => S.grid[i] && !own.has(i))) continue;
+        y.cells.forEach(i => { S.grid[i] = null; });
+        y.shape = s; y.cells = cells.sort((a, b) => a - b);
+        y.cells.forEach(i => { S.grid[i] = y; });
+        return true;
+      }
+    }
+    return false;
+  }
 
   // ── 合體 ──
   function refreshGroup(g) {
@@ -385,7 +427,7 @@
       if (x.priceMult !== 1) f.push([x.priceMult > 1 ? "新鮮" : "放久了", x.priceMult]);
     }
     for (const y of around(x)) if (!y.neutralized && y.ing.rule === "discount") f.push([`被${y.ing.name}嫌棄`, 1 - y.ing.params.rate]);
-    for (const r of relations(x)) f.push([`${elementOf(r.y)}${r.kind}${elementOf(x)}（${r.y.ing.name}）`, r.kind === "生" ? 1 + C.wuxing.generate : 1 - C.wuxing.overcome]);
+    for (const r of relations(x)) if (r.kind === "生") f.push([`${elementOf(r.y)}生${elementOf(x)}（${r.y.ing.name}）`, 1 + C.wuxing.generate]);
     return f;
   }
   const factors = x => (isGroup(x) ? [] : ownFactors(x)).concat(placeFactors(x));
@@ -665,13 +707,14 @@
   function ghostTick() {
     requestAnimationFrame(ghostTick);
     const x = S.hand;
-    if (!x || S.busy || $("#screen-play").hidden) { if (ghostKey) { paintGhost([], false, false); ghostKey = ""; } return; }
+    if (!x || S.busy || $("#screen-play").hidden) { if (ghostKey) { paintGhost([], false, false); $("#btnDraw").classList.remove("hot"); ghostKey = ""; } return; }
     const aim = handAim(shapeW(x.shape)), col = aim.col, r = landingRow(x.shape, col), perfect = judge(aim.f) === "perfect";
     const key = `${plateVersion}|${col}|${r}|${x.shape.join(";")}|${perfect}`;
     if (key === ghostKey) return;
     ghostKey = key;
     const cells = x.shape.map(([a, b]) => [r + a, col + b]);
     paintGhost(cells.filter(([R]) => R >= 0).map(([R, Cc]) => R * COLS + Cc), cells.some(([R]) => R < 0), perfect);
+    $("#btnDraw").classList.toggle("hot", perfect);
   }
   function paintGhost(idx, bad, perfect) {
     document.querySelectorAll("#plate .cell.ghost").forEach(c => c.classList.remove("ghost", "bad", "perfect"));
@@ -721,7 +764,7 @@
     const room = ROWS - height;
     if (S.hand) {
       hint.append(`占 ${S.hand.shape.length} 格`, shapeMini(S.hand.shape), "　",
-        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : `落點亮金光時放手＝Perfect${S.combo > 1 ? `（現在連擊 ${S.combo}）` : ""}。按「撒！」、空白鍵或點盤子。`);
+        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : `落點亮金光時放手＝Perfect${S.combo > 1 ? `（現在連擊 ${S.combo}）` : ""}。${COARSE ? "按大圓鈕「撒！」。" : "按「撒！」、空白鍵或點盤子。"}`);
     } else if (S.grid.some(Boolean)) {
       hint.append(room === 0 ? "最高那欄已經頂到盤緣了，再撒小心打翻。" : room === 1 ? "最高那欄只剩一層就到盤緣。" : `最高那欄離盤緣還有 ${room} 層。`);
     }
@@ -750,13 +793,41 @@
     $("#reinWrap").classList.toggle("float", ointmentDone());
   }
 
+  // 送餐拉桿：長按拉到底才送（手機防誤觸）；鍵盤 Enter／聚焦後按鍵直接送
+  const LEVER_MS = 550;
+  function bindLever() {
+    const lv = $("#btnServe");
+    let raf = 0, done = false;
+    const set = p => lv.style.setProperty("--p", p);
+    const stop = () => { cancelAnimationFrame(raf); raf = 0; set(0); lv.classList.remove("pull"); };
+    lv.addEventListener("pointerdown", e => {
+      if (e.button || lv.disabled) return;
+      e.preventDefault();
+      try { lv.setPointerCapture(e.pointerId); } catch (err) { /* 合成事件沒有真的指標 */ }
+      const t0 = performance.now();
+      done = false;
+      lv.classList.add("pull");
+      const step = now => {
+        const p = Math.min(1, (now - t0) / LEVER_MS);
+        set(p);
+        if (p < 1) { raf = requestAnimationFrame(step); return; }
+        done = true; stop(); buzz(40); onServe();
+      };
+      raf = requestAnimationFrame(step);
+    });
+    const release = () => { if (!raf) return; stop(); if (!done) log("送餐拉桿要長按，拉到底才會送。"); };
+    for (const ev of ["pointerup", "pointercancel"]) lv.addEventListener(ev, release);
+    lv.addEventListener("click", e => { if (e.detail === 0) onServe(); });
+    lv.addEventListener("contextmenu", e => e.preventDefault());
+  }
+
   function setButtons() {
     if (S.sim) return;
     const b = $("#btnDraw");
-    b.textContent = S.hand ? "撒！" : "抽一樣";
+    $("#domeCap").textContent = S.hand ? "撒！" : "抽";
     b.disabled = S.busy || (!S.hand && (topFull() || !S.deck.length));
     const rot = $("#btnRotate");
-    rot.hidden = !S.hand || S.hand.shapes.length < 2;
+    rot.classList.toggle("off", !S.hand || S.hand.shapes.length < 2);
     rot.disabled = S.busy;
     $("#btnServe").disabled = S.busy || !liveItems().length;
   }
@@ -774,7 +845,7 @@
   }
 
   // ── 材料詳情 ──
-  const wuxingLine = e => GEN[e] ? `${e}生${GEN[e]}、${e}剋${KE[e]}；怕${KE_BY[e]}剋，喜${GEN_BY[e]}生。` : "";
+  const wuxingLine = e => GEN[e] ? `${e}生${GEN[e]}、${e}剋${KE[e]}；喜${GEN_BY[e]}生（×${1 + C.wuxing.generate}），怕${KE_BY[e]}剋：被一件剋到會被撞得轉向，被兩件夾剋就散掉。` : "";
   function openInfo(x, inHand) {
     if (isGroup(x)) return openGroupInfo(x);
     const box = $("#infoBox"); box.textContent = "";
@@ -966,9 +1037,8 @@
     if (done) return say(`⋯⋯！${done.result}！`, "happy");
     if (ing.tags.includes("inedible")) return say(`${displayName(x)}⋯⋯不能吃，當裝飾吧。`, "meh");
     const rel = relations(x);
-    const g = rel.filter(r => r.kind === "生"), k = rel.filter(r => r.kind === "剋");
-    if (g.length && !k.length) return say(`${g[0].y.ing.name}的${elementOf(g[0].y)}生${elementOf(x)}，${displayName(x)}更好吃了。`, "happy");
-    if (k.length && !g.length) return say(`${k[0].y.ing.name}的${elementOf(k[0].y)}剋${elementOf(x)}⋯⋯味道被壓下去了。`, "meh");
+    const g = rel.filter(r => r.kind === "生");
+    if (g.length) return say(`${g[0].y.ing.name}的${elementOf(g[0].y)}生${elementOf(x)}，${displayName(x)}更好吃了。`, "happy");
     if (ing.zone !== "normal" || x.rar.id !== "R") return say(`${displayName(x)}⋯⋯`, "idle");
     setFace("idle");
   }
@@ -1013,6 +1083,7 @@
     const landed = x.cells.length ? anchorEl(x.uid) : null;
     await sleep(landed ? dropMs(landed.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 40 : 420);
     // 落地當下就跳判定
+    buzz(q === "perfect" ? [18, 40, 28] : x.cells.length >= 3 ? 34 : 20);
     const spot = landed ? anchorEl(x.uid) : null;
     if (q === "perfect") floatAt(spot, S.combo > 1 ? `Perfect ×${S.combo}` : "Perfect!", "perfect");
     else if (q === "good") floatAt(spot, "Good", "good");
@@ -1026,6 +1097,7 @@
 
     const fu = fuseStep();
     if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
+    const wxLine = await wuxingChain();
 
     const tox = toxicStep(x);
     if (tox.fatal) return endRound(tox.fatal);
@@ -1041,16 +1113,17 @@
       say(g.combo === ointment ? (ointment.verdict || "飛行軟膏完成。") : `⋯⋯！${g.combo.result}！`, g.combo === ointment ? "dizzy" : "happy");
     } else if (tox.immune) say(ointment.verdict || "飛行軟膏完成。", "dizzy");
     else if (fu.fused.length) say(`合體！${fu.fused[0].ing.name}。`, "happy");
+    else if (wxLine) say(wxLine[0], wxLine[1]);
     else if (tox.survived) say(`${x.ing.name}⋯⋯還好，沒事。`, "scared");
     else if (!imp.said) placeLine(x);
     await afterPlace();
   }
 
-  // 在某塊材料上方飄一行字（判定、得分），不擋流程
+  // 在某塊材料（或某個位置）上方飄一行字（判定、得分），不擋流程
   function floatAt(el, text, cls, delay = 0) {
     if (S.sim) return;
     const well = $("#well"), wr = well.getBoundingClientRect();
-    const r = el ? el.getBoundingClientRect() : $("#plate").getBoundingClientRect();
+    const r = !el ? $("#plate").getBoundingClientRect() : el.getBoundingClientRect ? el.getBoundingClientRect() : el;
     const f = h("div", { class: "float-txt " + cls, style: `left:${r.left - wr.left + r.width / 2}px;top:${r.top - wr.top + 4}px` }, text);
     well.append(f);
     f.animate([{ opacity: 0, transform: "translate(-50%, 6px) scale(.7)" }, { opacity: 1, transform: "translate(-50%, -8px) scale(1.12)", offset: .18 }, { opacity: 1, transform: "translate(-50%, -14px) scale(1)", offset: .7 }, { opacity: 0, transform: "translate(-50%, -34px) scale(1)" }],
@@ -1075,6 +1148,54 @@
     if (fu.completed.length) await popText(fu.completed[0].combo.result + "！", true);
     else if (fu.fused.length) await popText("合體！");
     else await sleep(300);
+  }
+
+  // 五行連鎖演出：散掉的碎開飛走、轉向的轉一圈；回傳零韻要說的話
+  async function wuxingChain() {
+    let line = null;
+    for (let k = 0; k < 6; k++) {
+      const ghosts = [];
+      for (const el of document.querySelectorAll("#plate .piece")) ghosts.push({ uid: +el.dataset.uid, el, rect: el.getBoundingClientRect(), anchor: el.dataset.anchor === "1" });
+      const wx = wuxingStep();
+      if (!wx.gone.length && !wx.turned.length) break;
+      const ov = $("#overlay"), anims = [];
+      for (const { y } of wx.gone) for (const gh of ghosts.filter(g => g.uid === y.uid)) {
+        const el = gh.el.cloneNode(true), r = gh.rect, dir = Math.random() < .5 ? -1 : 1;
+        el.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:55;`;
+        ov.append(el);
+        anims.push(el.animate([{ transform: "none", opacity: 1, filter: "none" },
+          { transform: `translate(${dir * 6}px, -4px) rotate(${dir * 4}deg)`, opacity: 1, filter: "brightness(1.8)", offset: .25 },
+          { transform: `translate(${dir * 60}px, 40px) rotate(${dir * 50}deg) scale(.4)`, opacity: 0, filter: "brightness(1.8)" }],
+          { duration: 700, easing: "cubic-bezier(.5,0,.8,.6)", fill: "forwards" }).finished.then(() => el.remove(), () => el.remove()));
+      }
+      renderPlate();
+      for (const t of wx.turned) {
+        const parts = pieceEls(t.y.uid);
+        if (t.spun) parts.forEach(p => p.animate([{ transform: "rotate(-90deg) scale(.7)" }, { transform: "rotate(12deg) scale(1.05)", offset: .7 }, { transform: "none" }], { duration: 520, easing: "ease-out" }));
+        else parts.forEach(p => p.animate([{ transform: "none" }, { transform: "rotate(-8deg)", offset: .25 }, { transform: "rotate(6deg)", offset: .6 }, { transform: "none" }], { duration: 420 }));
+        t.how = t.spun ? "轉向" : t.y.shapes.length < 2 ? "晃了一下" : "卡住";
+        floatAt(anchorEl(t.y.uid), `${elementOf(t.by)}剋${elementOf(t.y)}・${t.how}`, "miss");
+      }
+      for (const { y, src } of wx.gone) {
+        const gh = ghosts.find(g => g.uid === y.uid && g.anchor);
+        floatAt(gh && gh.rect, `${src.map(elementOf).join("")}夾剋・${y.ing.name}散了`, "pts neg");
+      }
+      if (wx.gone.length) {
+        buzz([30, 50, 30, 50, 60]);
+        const { y, src } = wx.gone[0];
+        line = [`${src.map(s => s.ing.name).join("和")}兩面夾剋⋯⋯${displayName(y)}散掉了。`, "scared"];
+        log(`五行夾剋：「${displayName(y)}」被${src.map(s => `${s.ing.name}（${elementOf(s)}）`).join("、")}剋散了。`);
+      } else if (!line) {
+        const t = wx.turned[0];
+        const what = { 轉向: "被撞得轉了方向", 晃了一下: "被撞得晃了一下", 卡住: "被撞到，可是卡住了轉不動" }[t.how];
+        line = [`${t.by.ing.name}的${elementOf(t.by)}剋${elementOf(t.y)}，${displayName(t.y)}${what}。旁邊再多一個剋它的就會散掉。`, "meh"];
+      }
+      await Promise.all(anims);
+      await sleep(wx.moved.length ? 520 : 380);
+      const fu = fuseStep();
+      if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
+    }
+    return line;
   }
 
   async function afterPlace() {
@@ -1133,6 +1254,8 @@
     await sleep(700);
     const fu = fuseStep();
     if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
+    const wxLine = await wuxingChain();
+    if (wxLine) say(wxLine[0], wxLine[1]);
   }
 
   // ── 送餐 ──
@@ -1157,7 +1280,7 @@
       if (!src) log("聚寶盆找不到能複製的東西。");
       else if (!cols.length) { log(`聚寶盆想複製「${displayName(src)}」，可是盤子放不下。`); await sleep(900); }
       else {
-        const copy = { ...src, uid: ++S.uid, dup: true, used: false, cells: [] };
+        const copy = { ...src, uid: ++S.uid, dup: true, used: false, cells: [], keSeen: null };
         const col = pick(cols);
         placeAt(copy, col);
         renderPlate({ drop: { x: copy, from: col, col } });
@@ -1170,6 +1293,8 @@
         }
         const fu = fuseStep();
         if (fu.fused.length || fu.absorbed.length || fu.moved.size) await animateFusion(fu);
+        const wxLine = await wuxingChain();
+        if (wxLine) { say(wxLine[0], wxLine[1]); await sleep(700); }
       }
     }
 
@@ -1601,7 +1726,7 @@
   function resetRound(c) {
     S.container = c;
     S.contName = c.params && c.params.skinChance && Math.random() < c.params.skinChance ? c.params.skinName : c.name;
-    S.grid = Array(CELLS).fill(null); S.hand = null; S.eaten = []; S.dropped = []; S.spilled = null;
+    S.grid = Array(CELLS).fill(null); S.hand = null; S.eaten = []; S.dropped = []; S.scattered = []; S.spilled = null;
     S.deck = D.ingredients.slice(); S.penalty = 0; S.turn = 0; S.busy = false;
     S.flags = { affNoted: S.flags.affNoted };
     S.combo = 0;
@@ -1676,6 +1801,7 @@
     });
     S.eaten.forEach(x => rows.push(row(x, "偷吃", true)));
     S.dropped.forEach(x => rows.push(row(x, "掉落", true)));
+    S.scattered.forEach(x => rows.push(row(x, "被剋散", true)));
     if (S.spilled && !S.spilled.cells.length) rows.push(row(S.spilled, "打翻", true));
     if (!L.fatal) {
       for (const combo of L.sc.combos) if (combo.bonus) rows.push(h("div", { class: "c-row extra" }, h("span", { class: "n" }, `組合：${combo.result}`), h("span", { class: "p" }, "+" + pts(combo.bonus))));
@@ -1756,6 +1882,7 @@
         const imp = impactStep(x, placeAt(x, col));
         if (imp.fatal) { res = imp.fatal.type; break; }
         fuseStep();
+        for (let k = 0; k < 6; k++) { const wx = wuxingStep(); if (!wx.gone.length && !wx.turned.length) break; fuseStep(); }
         const tox = toxicStep(x);
         if (tox.fatal) { res = tox.fatal.type; break; }
         if (cont().rule === "need_liquid" && !liveItems().some(isLiquid)) S.penalty += S.container.params.penaltyPerTurn;
@@ -1785,13 +1912,23 @@
     delete out.ratio;
     return out;
   }
-  if (new URLSearchParams(location.search).has("debug")) window.__rein = { simulate, state: S, playTrick };
+  if (new URLSearchParams(location.search).has("debug")) window.__rein = { simulate, state: S, playTrick, renderPlate };
 
   // ── 綁定 ──
   $("#plate").style.cssText = `grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${ROWS},minmax(0,1fr));aspect-ratio:${COLS}/${ROWS};`;
   $("#btnStart").onclick = toContainers;
-  $("#btnDraw").onclick = () => (S.hand ? onDrop() : onDraw());
-  $("#btnServe").onclick = onServe;
+  // 大圓鈕：按下去的瞬間就放手（抓時機的遊戲，不等手指抬起）；不搶焦點，免得空白鍵又按到它
+  const domePress = () => (S.hand ? onDrop() : onDraw());
+  $("#btnDraw").addEventListener("pointerdown", e => {
+    if (e.button || $("#btnDraw").disabled) return;
+    e.preventDefault();
+    $("#btnDraw").classList.add("press");
+    buzz(10);
+    domePress();
+  });
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("#btnDraw").addEventListener(ev, () => $("#btnDraw").classList.remove("press"));
+  $("#btnDraw").addEventListener("click", e => { if (e.detail === 0) domePress(); });
+  bindLever();
   $("#btnDiscard").onclick = onDiscard;
   $("#btnRotate").onclick = onRotate;
   $("#btnAgain").onclick = toContainers;
@@ -1802,7 +1939,8 @@
   $("#btnClose").onclick = () => { $("#cardModal").hidden = true; };
   $("#cardModal").onclick = e => { if (e.target.id === "cardModal") $("#cardModal").hidden = true; };
   $("#infoModal").onclick = e => { if (e.target.id === "infoModal") closeInfo(); };
-  $("#well").addEventListener("click", e => { if (S.hand && !e.target.closest(".piece")) onDrop(); });
+  // 滑鼠可以直接點盤子撒；手機只靠機台按鈕，點盤子只看詳情
+  $("#well").addEventListener("click", e => { if (!COARSE && S.hand && !e.target.closest(".piece")) onDrop(); });
   const toggleObs = () => document.body.classList.toggle("obs");
   $("#btnObs").onclick = toggleObs;
   if (new URLSearchParams(location.search).has("obs")) document.body.classList.add("obs");
