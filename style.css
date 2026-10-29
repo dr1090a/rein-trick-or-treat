@@ -157,7 +157,10 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
   animation: swing var(--swing, 1300ms) linear infinite alternate;
 }
 .hand::before { content: ""; width: 9px; height: 9px; border: 1px solid var(--gold); border-radius: 50%; margin-top: -4px; background: var(--navy-light); }
-.hand::after { content: ""; order: 1; flex: 1; width: 1px; background: var(--gold); min-height: 8px; }
+.hand::after { content: ""; order: 1; width: 1px; height: 14px; background: var(--gold); }
+/* 吊著的方塊：跟落盤時同一套樣式，縮小掛在繩子下 */
+.hand-piece { position: absolute; left: 0; width: 100%; display: grid; gap: 6px; transform-origin: 50% 0; pointer-events: none; }
+.hand-piece .piece { cursor: default; box-shadow: 0 6px 14px rgba(0,0,0,.4); }
 .hand.idle { animation: none; left: calc(50% - var(--w) / 2); }
 .hand.idle::after { opacity: .4; }
 .hand.held { animation-play-state: paused; }

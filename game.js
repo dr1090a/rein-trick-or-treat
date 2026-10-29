@@ -551,43 +551,34 @@
         }
         continue;
       }
-      const rs = x.cells.map(i => rc(i)[0]), cs = x.cells.map(i => rc(i)[1]);
-      const r0 = Math.min(...rs), c0 = Math.min(...cs), hh = Math.max(...rs) - r0 + 1, ww = Math.max(...cs) - c0 + 1;
-      let style = `grid-row:${r0 + 1}/span ${hh};grid-column:${c0 + 1}/span ${ww};`;
-      const tok = token(x, false);
-      const isL = x.cells.length === 3;
-      if (isL) {
-        // L 形：2×2 外框挖掉一角，內容放在轉角那格
-        const miss = [[0, 0], [0, 1], [1, 0], [1, 1]].find(([a, b]) => !x.cells.includes((r0 + a) * COLS + c0 + b));
-        const clip = {
-          "0,0": "polygon(50% 0,100% 0,100% 100%,0 100%,0 50%,50% 50%)",
-          "0,1": "polygon(0 0,50% 0,50% 50%,100% 50%,100% 100%,0 100%)",
-          "1,0": "polygon(0 0,100% 0,100% 100%,50% 100%,50% 50%,0 50%)",
-          "1,1": "polygon(0 0,100% 0,100% 50%,50% 50%,50% 100%,0 100%)"
-        }[miss.join()];
-        style += `clip-path:${clip};grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;`;
-        tok.style.gridRow = String(2 - miss[0]);
-        tok.style.gridColumn = String(2 - miss[1]);
-      }
-      const el = h("div", { class: cls + (isL ? " L" : ""), style, "data-uid": x.uid, "data-anchor": "1" });
-      el.append(tok);
-      layer.append(el);
+      layer.append(buildPiece(x, x.cells.map(rc), false, cls));
     }
     plate.append(layer);
+    // 吊車區的高度跟著格子大小走：要塞得下縮小後兩層高的方塊
+    const cellH = plate.querySelector(".cell").getBoundingClientRect().height;
+    $("#dropper").style.height = Math.round(HAND_TOP + (2 * cellH + GAP) * HAND_SCALE + 18) + "px";
 
-    // 動畫：剛撒下的從手的高度掉下來；其他有移動的從舊位置滑過去
+    // 動畫：剛撒下的從吊車上的位置一邊掉一邊放大；其他有移動的從舊位置滑過去
     const cellW = (plate.clientWidth - 28 - GAP * (COLS - 1)) / COLS;
     const wellTop = $("#dropper").getBoundingClientRect().top;
     const drop = opts.drop;
     for (const el of layer.querySelectorAll(".piece[data-anchor='1']")) {
       const uid = el.dataset.uid, now = el.getBoundingClientRect(), parts = pieceEls(uid);
       if (drop && String(drop.x.uid) === uid) {
-        const dy = now.top - wellTop + 10, dx = (drop.from - drop.col) * (cellW + GAP);
         const ms = dropMs(now.top - wellTop);
-        const frames = drop.from === drop.col
-          ? [{ transform: `translateY(${-dy}px)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: "translateY(0)", offset: .8 }, { transform: "translateY(-6px) scaleY(.94)", offset: .9 }, { transform: "none" }]
-          : [{ transform: `translate(${dx}px, ${-dy}px)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: `translate(${dx}px, 0)`, offset: .66, easing: "ease-out" }, { transform: `translate(${dx * .45}px, -22px)`, offset: .82, easing: "ease-in" }, { transform: "none", offset: .94 }, { transform: "none" }];
-        parts.forEach(p => p.animate(frames, { duration: ms }));
+        const dx = (drop.from - drop.col) * (cellW + GAP);
+        let frames;
+        if (drop.fromRect) {
+          const f = drop.fromRect, k = f.width / now.width, sx = f.left - now.left, sy = f.top - now.top;
+          const start = { transform: `translate(${sx}px, ${sy}px) scale(${k})`, easing: "cubic-bezier(.55,0,1,.6)" };
+          frames = drop.from === drop.col
+            ? [start, { transform: "none", offset: .8 }, { transform: "translateY(-6px) scaleY(.94)", offset: .9 }, { transform: "none" }]
+            : [start, { transform: `translate(${dx}px, 0)`, offset: .66, easing: "ease-out" }, { transform: `translate(${dx * .45}px, -22px)`, offset: .82, easing: "ease-in" }, { transform: "none", offset: .94 }, { transform: "none" }];
+        } else {
+          const dy = now.top - wellTop + 10;
+          frames = [{ transform: `translateY(${-dy}px)`, easing: "cubic-bezier(.55,0,1,.6)" }, { transform: "translateY(0)", offset: .8 }, { transform: "translateY(-6px) scaleY(.94)", offset: .9 }, { transform: "none" }];
+        }
+        parts.forEach(p => { p.style.transformOrigin = "0 0"; p.animate(frames, { duration: ms }); });
         continue;
       }
       const old = before.get(uid);
@@ -604,8 +595,33 @@
     renderSide(height);
   }
   const dropMs = px => Math.round(320 + Math.sqrt(Math.max(0, px)) * 18);
+  const HAND_SCALE = 0.6, HAND_TOP = 22;
 
-  // 盤子上方的手：吊著手上的材料左右擺盪
+  // 一塊材料（非合體塊）：rcs＝它占的 [列, 欄]，畫在一張 grid 上；盤上和吊車上共用
+  function buildPiece(x, rcs, inHand, cls) {
+    const rs = rcs.map(p => p[0]), cs = rcs.map(p => p[1]);
+    const r0 = Math.min(...rs), c0 = Math.min(...cs), hh = Math.max(...rs) - r0 + 1, ww = Math.max(...cs) - c0 + 1;
+    let style = `grid-row:${r0 + 1}/span ${hh};grid-column:${c0 + 1}/span ${ww};`;
+    const tok = token(x, inHand);
+    const isL = rcs.length === 3;
+    if (isL) {
+      // L 形：2×2 外框挖掉一角，內容放在轉角那格
+      const has = new Set(rcs.map(p => p.join()));
+      const miss = [[0, 0], [0, 1], [1, 0], [1, 1]].find(([a, b]) => !has.has(`${r0 + a},${c0 + b}`));
+      const clip = {
+        "0,0": "polygon(50% 0,100% 0,100% 100%,0 100%,0 50%,50% 50%)",
+        "0,1": "polygon(0 0,50% 0,50% 50%,100% 50%,100% 100%,0 100%)",
+        "1,0": "polygon(0 0,100% 0,100% 100%,50% 100%,50% 50%,0 50%)",
+        "1,1": "polygon(0 0,100% 0,100% 50%,50% 50%,50% 100%,0 100%)"
+      }[miss.join()];
+      style += `clip-path:${clip};grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;`;
+      tok.style.gridRow = String(2 - miss[0]);
+      tok.style.gridColumn = String(2 - miss[1]);
+    }
+    return h("div", { class: (cls || `piece rar-${x.rar.id} ${tokMeta(x, inHand).cls}`) + (isL ? " L" : ""), style, "data-uid": x.uid, "data-anchor": "1" }, tok);
+  }
+
+  // 盤子上方的吊車：吊著跟落盤時一模一樣的方塊（縮小），左右擺盪
   function renderHand() {
     const hand = $("#hand");
     hand.textContent = "";
@@ -616,7 +632,10 @@
     hand.style.setProperty("--w", width);
     if (!x) { hand.classList.add("idle"); hand.append(h("span", { class: "hand-item empty" }, S.busy ? "" : "抽一樣")); return; }
     if (x.swing) hand.style.setProperty("--swing", x.swing + "ms");
-    hand.append(h("span", { class: "hand-item" }, h("span", { class: "rar " + x.rar.id }, x.rar.id), displayName(x) + (x.juiced ? "汁" : ""), shapeMini(x.shape)));
+    const hgt = Math.max(...x.shape.map(s => s[0])) + 1;
+    const grid = h("div", { class: "hand-piece", style: `grid-template-columns:repeat(${w},minmax(0,1fr));grid-template-rows:repeat(${hgt},minmax(0,1fr));aspect-ratio:${w}/${hgt};top:${HAND_TOP}px;transform:scale(${HAND_SCALE});` });
+    grid.append(buildPiece(x, x.shape, true));
+    hand.append(grid);
   }
   // 手現在對準哪一欄：拿手的左緣跟第一列每一格的左緣比
   function handColumn(w) {
@@ -967,11 +986,13 @@
     const x = S.hand, w = shapeW(x.shape);
     const aim = handColumn(w), col = bounce(aim, w);
     $("#hand").classList.add("held");
+    const held = $("#hand .hand-piece .piece");
+    const fromRect = held ? held.getBoundingClientRect() : null;
     S.hand = null;
     setButtons();
     if (x.ing.rule === "fake_label") S.flags.busuKept = true;
     const overflow = placeAt(x, col);
-    renderPlate({ drop: { x, from: aim, col } });
+    renderPlate({ drop: { x, from: aim, col, fromRect } });
     const landedTop = x.cells.length ? anchorEl(x.uid) : null;
     await sleep(landedTop ? dropMs(landedTop.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 60 : 420);
     if (aim !== col) log(`手一滑，「${displayName(x)}」彈到隔壁那欄。`);
