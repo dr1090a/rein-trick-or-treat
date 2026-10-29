@@ -191,8 +191,13 @@ window.GAME_DATA = {
     juiceRate: 0.5,         // 骷髏杯把非液體打成果汁，分數 ×0.5
     cols: 4, rows: 4,       // 盤子 4 欄 × 4 層；堆過盤緣＝打翻，頂層全滿自動送餐
     swingMs: 1300,          // 零韻的手從一端擺到另一端的時間（毫秒）
-    swingJitter: 0.3,       // 每次抽卡擺速隨機 ±30%
-    bounceChance: 0.12,     // 撒下時手滑、彈到隔壁欄的機率
+    swingJitter: 0.15,      // 每次抽卡擺速隨機 ±15%
+    swingAccel: 0.06,       // 越撒越快：每撒一次擺盪時間 −6%
+    swingMin: 0.5,          // 最快到原本的一半時間
+    // 放手判定：f＝偏離欄位正中的程度（0 正中、0.5 卡在兩欄中間）
+    // window 以內 Perfect（×(1+base)，連擊每多一下 +combo，最多 +max）；good 以內 Good；再偏就 Miss，missSlip 的機率滑到偏的那邊
+    perfect: { window: 0.12, good: 0.3, base: 0.2, combo: 0.1, max: 0.6, missSlip: 0.5 },
+    bounceChance: 0.02,     // 撒下時手滑、彈到隔壁欄的機率
     rabbitChance: 0.3,      // 旋轉時被兔子撞歪的機率（撞歪＝轉成隨機方向，可能沒轉成）
     fuseRate: 0.25,         // 合體塊每多一件，整塊分數 +25%
     containerChoices: 3,    // 每局隨機給幾個容器挑；設 1 = 完全隨機

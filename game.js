@@ -146,7 +146,7 @@
     hp: C.maxHp, aff: 0,
     container: null, contName: "", req: null,
     grid: [], hand: null, eaten: [], dropped: [], deck: [], spilled: null,
-    penalty: 0, turn: 0, busy: false, last: null, uid: 0,
+    penalty: 0, turn: 0, combo: 0, busy: false, last: null, uid: 0,
     flags: {}, sim: false
   };
 
@@ -374,6 +374,7 @@
     if (c.rule === "liquid_only") f.push(m.juiced ? ["果汁", C.juiceRate] : ["液體", p.liquidMultiplier || 1]);
     if (c.rule === "witch_bonus" && m.ing.tags.includes("witch")) f.push(["魔女大釜", p.witchMultiplier || 1]);
     if (m.priceMult !== 1) f.push([m.priceMult > 1 ? "新鮮" : "放久了", m.priceMult]);
+    if (m.dropMult > 1) f.push([m.combo > 1 ? `Perfect 連擊 ${m.combo}` : "Perfect", m.dropMult]);
     return f;
   }
   // 位置帶來的倍率（嫌棄、五行、合體）；合體塊整塊算一次
@@ -587,7 +588,7 @@
         parts.forEach(p => p.animate(f, { duration: 280, easing: "cubic-bezier(.55,0,1,.6)" }));
       }
       if (opts.pulse && opts.pulse.includes(+uid)) {
-        parts.forEach(p => p.animate([{ boxShadow: "0 0 0 0 rgba(201,169,97,.95)", filter: "brightness(1.6)" }, { boxShadow: "0 0 0 12px rgba(201,169,97,0)", filter: "none" }], { duration: 700, easing: "ease-out" }));
+        parts.forEach(p => p.animate([{ boxShadow: "0 0 0 0 rgba(232,134,47,.95)", filter: "brightness(1.6)" }, { boxShadow: "0 0 0 12px rgba(232,134,47,0)", filter: "none" }], { duration: 700, easing: "ease-out" }));
       }
     }
 
@@ -638,34 +639,47 @@
     hand.append(grid);
   }
   // 手現在對準哪一欄：拿手的左緣跟第一列每一格的左緣比
-  function handColumn(w) {
+  // f＝偏離那一欄的程度（0 正中、0.5 剛好卡在兩欄中間），lean＝往哪邊偏
+  function handAim(w) {
     const left = $("#hand").getBoundingClientRect().left;
-    const cells = [...document.querySelectorAll("#plate .cell")].slice(0, COLS);
-    let best = 0, d = Infinity;
-    for (let c = 0; c <= COLS - w; c++) { const dd = Math.abs(cells[c].getBoundingClientRect().left - left); if (dd < d) { d = dd; best = c; } }
-    return best;
+    const ls = [...document.querySelectorAll("#plate .cell")].slice(0, COLS).map(c => c.getBoundingClientRect().left);
+    let col = 0, d = Infinity;
+    for (let c = 0; c <= COLS - w; c++) if (Math.abs(left - ls[c]) < Math.abs(d)) { d = left - ls[c]; col = c; }
+    return { col, f: Math.min(.5, Math.abs(d) / (ls[1] - ls[0])), lean: Math.sign(d) };
+  }
+  const handColumn = w => handAim(w).col;
+  const judge = f => f <= C.perfect.window ? "perfect" : f <= C.perfect.good ? "good" : "miss";
+  // 放手的判定 → 實際落欄、連擊、Perfect 加成（遊戲和模擬共用）
+  function release(x, aim) {
+    const w = shapeW(x.shape), q = judge(aim.f);
+    let col = aim.col;
+    if (q === "miss" && aim.lean && Math.random() < C.perfect.missSlip) col = Math.max(0, Math.min(COLS - w, col + aim.lean));
+    col = bounce(col, w);
+    S.combo = q === "perfect" ? S.combo + 1 : 0;
+    if (q === "perfect") { x.combo = S.combo; x.dropMult = Math.min(1 + C.perfect.max, 1 + C.perfect.base + C.perfect.combo * (S.combo - 1)); }
+    return { q, col };
   }
 
-  // 落點影子：手擺到哪，盤上就亮出沒手滑的話會落在哪；會凸出盤緣就變紅
+  // 落點影子：手擺到哪，盤上就亮出會落在哪；Perfect 的時機亮金光，會凸出盤緣就變紅
   let ghostKey = "", plateVersion = 0;
   function ghostTick() {
     requestAnimationFrame(ghostTick);
     const x = S.hand;
-    if (!x || S.busy || $("#screen-play").hidden) { if (ghostKey) { paintGhost([], false); ghostKey = ""; } return; }
-    const col = handColumn(shapeW(x.shape)), r = landingRow(x.shape, col);
-    const key = `${plateVersion}|${col}|${r}|${x.shape.join(";")}`;
+    if (!x || S.busy || $("#screen-play").hidden) { if (ghostKey) { paintGhost([], false, false); ghostKey = ""; } return; }
+    const aim = handAim(shapeW(x.shape)), col = aim.col, r = landingRow(x.shape, col), perfect = judge(aim.f) === "perfect";
+    const key = `${plateVersion}|${col}|${r}|${x.shape.join(";")}|${perfect}`;
     if (key === ghostKey) return;
     ghostKey = key;
     const cells = x.shape.map(([a, b]) => [r + a, col + b]);
-    paintGhost(cells.filter(([R]) => R >= 0).map(([R, Cc]) => R * COLS + Cc), cells.some(([R]) => R < 0));
+    paintGhost(cells.filter(([R]) => R >= 0).map(([R, Cc]) => R * COLS + Cc), cells.some(([R]) => R < 0), perfect);
   }
-  function paintGhost(idx, bad) {
-    document.querySelectorAll("#plate .cell.ghost").forEach(c => c.classList.remove("ghost", "bad"));
-    for (const i of idx) { const c = document.querySelector(`#plate .cell[data-i="${i}"]`); if (c) c.classList.add("ghost", ...(bad ? ["bad"] : [])); }
+  function paintGhost(idx, bad, perfect) {
+    document.querySelectorAll("#plate .cell.ghost").forEach(c => c.classList.remove("ghost", "bad", "perfect"));
+    for (const i of idx) { const c = document.querySelector(`#plate .cell[data-i="${i}"]`); if (c) c.classList.add("ghost", ...(bad ? ["bad"] : perfect ? ["perfect"] : [])); }
   }
 
   // 旋轉：有機率被兔子撞歪，轉成隨機方向（也可能根本沒轉成）
-  const RABBIT = '<svg viewBox="0 0 64 44"><path d="M10 40q-6-1-4-7 4-12 20-14l12-1q-3-7-1-14 2-4 5 0 2 5 1 11 4-7 8-8 4 0 2 4-3 6-7 9 6 3 7 9 0 6-6 8l-6 1-4 3h-5l1-3h-9l-4 4h-5l2-4z" fill="#f5f0e6" stroke="#1a2332" stroke-width="1.6" stroke-linejoin="round"/><circle cx="51" cy="25" r="1.8" fill="#1a2332"/><path d="M60 29l2 1" stroke="#1a2332" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="31" r="3.4" fill="#f5f0e6" stroke="#1a2332" stroke-width="1.4"/></svg>';
+  const RABBIT = '<svg viewBox="0 0 64 44"><path d="M10 40q-6-1-4-7 4-12 20-14l12-1q-3-7-1-14 2-4 5 0 2 5 1 11 4-7 8-8 4 0 2 4-3 6-7 9 6 3 7 9 0 6-6 8l-6 1-4 3h-5l1-3h-9l-4 4h-5l2-4z" fill="#f5f0e6" stroke="#16111f" stroke-width="1.6" stroke-linejoin="round"/><circle cx="51" cy="25" r="1.8" fill="#16111f"/><path d="M60 29l2 1" stroke="#16111f" stroke-width="1.4" stroke-linecap="round"/><circle cx="7" cy="31" r="3.4" fill="#f5f0e6" stroke="#16111f" stroke-width="1.4"/></svg>';
   async function rabbitBump() {
     const track = $(".track"), hand = $("#hand");
     hand.classList.add("held");
@@ -707,7 +721,7 @@
     const room = ROWS - height;
     if (S.hand) {
       hint.append(`占 ${S.hand.shape.length} 格`, shapeMini(S.hand.shape), "　",
-        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : "盤上亮起來的就是落點。看準時機按「撒！」（空白鍵或點盤子）");
+        busu ? `標籤寫著「${(S.hand.ing.params && S.hand.ing.params.label) || "劇毒"}」⋯⋯撒下去？還是丟掉？` : `落點亮金光時放手＝Perfect${S.combo > 1 ? `（現在連擊 ${S.combo}）` : ""}。按「撒！」、空白鍵或點盤子。`);
     } else if (S.grid.some(Boolean)) {
       hint.append(room === 0 ? "最高那欄已經頂到盤緣了，再撒小心打翻。" : room === 1 ? "最高那欄只剩一層就到盤緣。" : `最高那欄離盤緣還有 ${room} 層。`);
     }
@@ -744,7 +758,7 @@
     const rot = $("#btnRotate");
     rot.hidden = !S.hand || S.hand.shapes.length < 2;
     rot.disabled = S.busy;
-    $("#btnServe").disabled = S.busy || !!S.hand || !liveItems().length;
+    $("#btnServe").disabled = S.busy || !liveItems().length;
   }
 
   // 盤面上方飄一行字（合體、組合完成）
@@ -879,7 +893,9 @@
     const x = newItem(drawFromDeck());
     if (x.ing.rule === "authenticity") x.fake = Math.random() < C.fakeChance;
     if (cont().rule === "liquid_only" && !x.ing.tags.includes("liquid")) x.juiced = true;
-    x.swing = Math.round(C.swingMs * (1 - C.swingJitter + Math.random() * C.swingJitter * 2));
+    // 越撒越快：每撒一次擺速加快 swingAccel，最快到 swingMin 倍的時間
+    const speed = Math.max(C.swingMin, 1 - C.swingAccel * (S.turn - 1));
+    x.swing = Math.round(C.swingMs * speed * (1 - C.swingJitter + Math.random() * C.swingJitter * 2));
     recordDex(x);
     return x;
   }
@@ -984,19 +1000,25 @@
     if (S.busy || !S.hand) return;
     S.busy = true;
     const x = S.hand, w = shapeW(x.shape);
-    const aim = handColumn(w), col = bounce(aim, w);
+    const aim = handAim(w), { q, col } = release(x, aim);
     $("#hand").classList.add("held");
     const held = $("#hand .hand-piece .piece");
     const fromRect = held ? held.getBoundingClientRect() : null;
+    const before = estimate().total;
     S.hand = null;
     setButtons();
     if (x.ing.rule === "fake_label") S.flags.busuKept = true;
     const overflow = placeAt(x, col);
-    renderPlate({ drop: { x, from: aim, col, fromRect } });
-    const landedTop = x.cells.length ? anchorEl(x.uid) : null;
-    await sleep(landedTop ? dropMs(landedTop.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 60 : 420);
-    if (aim !== col) log(`手一滑，「${displayName(x)}」彈到隔壁那欄。`);
-    else log(`撒下「${displayName(x)}」。`);
+    renderPlate({ drop: { x, from: aim.col, col, fromRect } });
+    const landed = x.cells.length ? anchorEl(x.uid) : null;
+    await sleep(landed ? dropMs(landed.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 40 : 420);
+    // 落地當下就跳判定
+    const spot = landed ? anchorEl(x.uid) : null;
+    if (q === "perfect") floatAt(spot, S.combo > 1 ? `Perfect ×${S.combo}` : "Perfect!", "perfect");
+    else if (q === "good") floatAt(spot, "Good", "good");
+    else floatAt(spot, aim.col !== col ? "偏了⋯⋯滑到隔壁" : "偏了", "miss");
+    if (aim.col !== col) log(`放手偏了，「${displayName(x)}」滑到隔壁那欄。`);
+    else log(q === "perfect" ? `Perfect！「${displayName(x)}」正中落點${S.combo > 1 ? `，連擊 ${S.combo}` : ""}。` : `撒下「${displayName(x)}」。`);
 
     const imp = impactStep(x, overflow);
     if (imp.fatal) return endRound(imp.fatal);
@@ -1008,6 +1030,11 @@
     const tox = toxicStep(x);
     if (tox.fatal) return endRound(tox.fatal);
 
+    // 這一下讓總分變多少
+    const delta = estimate().total - before;
+    const holder = holderOf(x);
+    if (delta) floatAt(anchorEl(holder.uid), (delta > 0 ? "+" : "") + delta + " 分", delta > 0 ? "pts" : "pts neg", 260);
+
     const ointment = COMBOS.find(c => c.effect === "float");
     if (fu.completed.length) {
       const g = fu.completed[0];
@@ -1017,6 +1044,17 @@
     else if (tox.survived) say(`${x.ing.name}⋯⋯還好，沒事。`, "scared");
     else if (!imp.said) placeLine(x);
     await afterPlace();
+  }
+
+  // 在某塊材料上方飄一行字（判定、得分），不擋流程
+  function floatAt(el, text, cls, delay = 0) {
+    if (S.sim) return;
+    const well = $("#well"), wr = well.getBoundingClientRect();
+    const r = el ? el.getBoundingClientRect() : $("#plate").getBoundingClientRect();
+    const f = h("div", { class: "float-txt " + cls, style: `left:${r.left - wr.left + r.width / 2}px;top:${r.top - wr.top + 4}px` }, text);
+    well.append(f);
+    f.animate([{ opacity: 0, transform: "translate(-50%, 6px) scale(.7)" }, { opacity: 1, transform: "translate(-50%, -8px) scale(1.12)", offset: .18 }, { opacity: 1, transform: "translate(-50%, -14px) scale(1)", offset: .7 }, { opacity: 0, transform: "translate(-50%, -34px) scale(1)" }],
+      { duration: 1100, delay, easing: "ease-out", fill: "both" }).finished.then(() => f.remove(), () => f.remove());
   }
 
   // 合體演出：散落的成員飛向本體、合體塊閃光、完成時大字
@@ -1051,6 +1089,8 @@
     renderPlate(); setButtons();
     if (topFull()) { log($("#log").textContent + " 盤子滿到盤緣了，直接送餐。"); await sleep(700); return onServe(); }
     if (!S.deck.length) log("食材櫃空了。只能送餐了。");
+    // 一鍵連撒：撒完自動吊上下一件，想停就收手送餐
+    else if (!$("#screen-play").hidden) onDraw();
   }
 
   // ── 隨機事件 ──
@@ -1097,7 +1137,9 @@
 
   // ── 送餐 ──
   async function onServe() {
-    if (S.busy || S.hand || !liveItems().length) return;
+    if (S.busy || !liveItems().length) return;
+    // 手上還吊著的那件放回去，不上盤
+    S.hand = null;
     S.busy = true; setButtons(); renderPlate();
     say("送餐！", "idle");
     await sleep(500);
@@ -1355,13 +1397,13 @@
     // 白布幽靈
     '<svg viewBox="0 0 44 60"><path d="M6 56V24a16 16 0 0 1 32 0v32l-6-5-5 5-5-5-5 5-5-5z"/><circle cx="16" cy="26" r="2.6" fill="currentColor"/><circle cx="28" cy="26" r="2.6" fill="currentColor"/><path d="M18 36q4 3 8 0"/></svg>'
   ];
-  const BAT = '<svg viewBox="0 0 64 30"><path d="M32 10q-4-8-8-2-6-6-14-2 2 8-8 10 10 2 12 10 4-6 10-4 3-6 8-6 5 0 8 6 6-2 10 4 2-8 12-10-10-2-8-10-8-4-14 2-4-6-8 2z" fill="#0b0f17" stroke="rgba(201,169,97,.55)" stroke-width="1"/><circle cx="29.5" cy="12" r="1" fill="#c9a961"/><circle cx="34.5" cy="12" r="1" fill="#c9a961"/></svg>';
-  const PUMPKIN = '<svg viewBox="0 0 220 200"><path d="M104 30q-2-18 10-26l8 4q-10 8-8 22z" fill="#5c4a26" stroke="#c9a961" stroke-width="2"/>' +
-    '<ellipse cx="110" cy="112" rx="104" ry="84" fill="#a08448"/><ellipse cx="110" cy="112" rx="62" ry="84" fill="#b39352"/><ellipse cx="110" cy="112" rx="22" ry="84" fill="#c9a961"/>' +
-    '<path d="M8 112q0 72 102 84q102-12 102-84" fill="none" stroke="#6e5a2e" stroke-width="2"/>' +
-    '<g class="glow" fill="#fff1c4"><path d="M52 92l30-6-14 30z"/><path d="M168 92l-30-6 14 30z"/><path d="M110 112l9 18h-18z"/><path d="M48 140q62 44 124 0l-12 6-8-10-10 12-12-10-12 12-12-12-12 10-8-10-10 12-8-8z"/></g></svg>';
-  const CURSOR = '<svg viewBox="0 0 24 34" width="28" height="40"><path d="M2 2v26l7-6 5 11 5-2-5-11h9z" fill="#f5f0e6" stroke="#1a2332" stroke-width="2" stroke-linejoin="round"/></svg>';
-  const SPLAT = '<svg viewBox="0 0 200 200"><path d="M100 18c14 0 12 26 26 28s28-22 38-10-12 30-2 42 36 0 36 16-30 10-30 26 26 26 14 38-30-8-40 4 2 36-14 38-14-28-28-28-24 26-36 16 6-30-6-40-34 6-36-10 26-18 22-32-26-22-14-34 30 6 36-8-6-36 10-40 18 20 26 20 6-26 20-26z" fill="#0d121b" stroke="rgba(201,169,97,.4)" stroke-width="2"/></svg>';
+  const BAT = '<svg viewBox="0 0 64 30"><path d="M32 10q-4-8-8-2-6-6-14-2 2 8-8 10 10 2 12 10 4-6 10-4 3-6 8-6 5 0 8 6 6-2 10 4 2-8 12-10-10-2-8-10-8-4-14 2-4-6-8 2z" fill="#0d0912" stroke="rgba(232,134,47,.55)" stroke-width="1"/><circle cx="29.5" cy="12" r="1" fill="#e8862f"/><circle cx="34.5" cy="12" r="1" fill="#e8862f"/></svg>';
+  const PUMPKIN = '<svg viewBox="0 0 220 200"><path d="M104 30q-2-18 10-26l8 4q-10 8-8 22z" fill="#3e2f1f" stroke="#e8862f" stroke-width="2"/>' +
+    '<ellipse cx="110" cy="112" rx="104" ry="84" fill="#b8672a"/><ellipse cx="110" cy="112" rx="62" ry="84" fill="#d07428"/><ellipse cx="110" cy="112" rx="22" ry="84" fill="#e8862f"/>' +
+    '<path d="M8 112q0 72 102 84q102-12 102-84" fill="none" stroke="#7a3c12" stroke-width="2"/>' +
+    '<g class="glow" fill="#ffe2a0"><path d="M52 92l30-6-14 30z"/><path d="M168 92l-30-6 14 30z"/><path d="M110 112l9 18h-18z"/><path d="M48 140q62 44 124 0l-12 6-8-10-10 12-12-10-12 12-12-12-12 10-8-10-10 12-8-8z"/></g></svg>';
+  const CURSOR = '<svg viewBox="0 0 24 34" width="28" height="40"><path d="M2 2v26l7-6 5 11 5-2-5-11h9z" fill="#f5f0e6" stroke="#16111f" stroke-width="2" stroke-linejoin="round"/></svg>';
+  const SPLAT = '<svg viewBox="0 0 200 200"><path d="M100 18c14 0 12 26 26 28s28-22 38-10-12 30-2 42 36 0 36 16-30 10-30 26 26 26 14 38-30-8-40 4 2 36-14 38-14-28-28-28-24 26-36 16 6-30-6-40-34 6-36-10 26-18 22-32-26-22-14-34 30 6 36-8-6-36 10-40 18 20 26 20 6-26 20-26z" fill="#110c18" stroke="rgba(232,134,47,.4)" stroke-width="2"/></svg>';
 
   const TRICKS = {
     // 停電：全黑，只剩跟著滑鼠走的手電筒；兩秒後零韻從光圈裡冒出來
@@ -1506,7 +1548,7 @@
       const app = $("#app");
       play(app, [{ transform: "none" }, { transform: "rotate(186deg)", offset: .7 }, { transform: "rotate(180deg)" }], { duration: 700, easing: "ease-in-out" });
       trickCaption(st, t, 1200);
-      const COLORS = ["#2b211b", "#33271f", "#3d2f24", "#241b16", "#4a3a2a", "#1f2a3c"];
+      const COLORS = ["#2b211b", "#33271f", "#3d2f24", "#241b16", "#4a3a2a", "#2a2040"];
       for (let i = 0; i < 26; i++) {
         const w = 18 + Math.random() * 18, hgt = 80 + Math.random() * 70, x = Math.random() * 96;
         const book = h("div", { class: "tk-book", style: `left:${x}vw;width:${w}px;height:${hgt}px;background:${pick(COLORS)}` });
@@ -1562,6 +1604,7 @@
     S.grid = Array(CELLS).fill(null); S.hand = null; S.eaten = []; S.dropped = []; S.spilled = null;
     S.deck = D.ingredients.slice(); S.penalty = 0; S.turn = 0; S.busy = false;
     S.flags = { affNoted: S.flags.affNoted };
+    S.combo = 0;
   }
   function toContainers() {
     if (S.hp <= 0) { S.hp = C.maxHp; S.aff = 0; S.flags.affNoted = false; }
@@ -1592,7 +1635,8 @@
     log(S.contName !== c.name ? `⋯⋯咦？南瓜盅變成了${S.contName}。好復古。` : `要求：${reqText(S.req)}。堆過盤緣會打翻，覺得夠了就收手。`);
     show("screen-play");
     renderPlate(); setButtons();
-    say(c.rule === "pineapple_legal" ? "⋯⋯披薩啊。" : "開始吧。我的手會晃，你自己看著辦。", c.rule === "pineapple_legal" ? "deadpan" : "idle");
+    onDraw();
+    say(c.rule === "pineapple_legal" ? "⋯⋯披薩啊。" : "開始吧。對準了再放手。", c.rule === "pineapple_legal" ? "deadpan" : "idle");
   }
 
   // ── 證書 ──
@@ -1657,7 +1701,7 @@
         h("span", { class: "l" }, "鑑定分數"),
         h("span", { class: "pl" }, `要求 ${L.req.total} 分`),
         h("span", { class: "v" }, pts(L.total))),
-      taste,
+      taste || "",
       h("div", { class: "c-bottom" },
         h("div", { class: "c-left" },
           h("div", { class: "c-verdict-l" }, "鑑定師判詞"),
@@ -1694,7 +1738,7 @@
   }
 
   // ── 數值校準用模擬（網址加 ?debug 才開）：隨機落點、堆到 stop 層就收手 ──
-  function simulate(n = 500, stop = 3) {
+  function simulate(n = 500, stop = 3, aimSkill = 0.15) {
     const keep = { ...S };
     S.sim = true;
     const totals = [], out = { n, stop, treat: 0, trick: 0, fatal: {}, other: 0, ratio: [] };
@@ -1706,7 +1750,9 @@
         const x = drawItem();
         if (x.ing.rule === "fake_label" && Math.random() < .5) continue;
         if (x.ing.rule === "fake_label") S.flags.busuKept = true;
-        const w = shapeW(x.shape), col = bounce(randInt(0, COLS - w), w);
+        // 模擬玩家的放手誤差：偏離中心的程度 ~ |常態| × aimSkill
+        const w = shapeW(x.shape), g = Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+        const { col } = release(x, { col: randInt(0, COLS - w), f: Math.min(.5, Math.abs(g) * aimSkill), lean: pick([-1, 1]) });
         const imp = impactStep(x, placeAt(x, col));
         if (imp.fatal) { res = imp.fatal.type; break; }
         fuseStep();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>餵食零韻・萬聖節</title>
 <meta name="description" content="在零韻的圖書館餐廳抽食材組料理，達標得 Treat，未達標吃 Trick，鳳梨落盤直接掀盤。">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231a2332'/%3E%3Cpath d='M16 9c-6 0-9 4-9 9s4 8 9 8 9-3 9-8-3-9-9-9z' fill='none' stroke='%23c9a961' stroke-width='2'/%3E%3Cpath d='M16 9V5' stroke='%23c9a961' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2316111f'/%3E%3Cpath d='M16 9c-6 0-9 4-9 9s4 8 9 8 9-3 9-8-3-9-9-9z' fill='none' stroke='%23e8862f' stroke-width='2'/%3E%3Cpath d='M16 9V5' stroke='%23e8862f' stroke-width='2'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Noto+Serif+TC:wght@400;600;700&display=swap" rel="stylesheet">
@@ -26,7 +26,9 @@
 
   <main class="layout">
     <section class="stage" id="stage">
-      <div class="shelf" aria-hidden="true"></div>
+      <div class="moon" aria-hidden="true"></div>
+      <div class="web" aria-hidden="true"></div>
+      <div class="shelf" aria-hidden="true"><span class="candle" style="left:9%"></span><span class="candle tall" style="right:11%"></span></div>
       <div class="bubble" id="bubble" aria-live="polite"></div>
       <div class="rein-wrap" id="reinWrap"><img id="rein" src="assets/rein/idle.webp" alt="零韻"></div>
       <div class="fx" id="fx" aria-hidden="true"></div>
@@ -43,7 +45,8 @@
           <summary>規則與小提示</summary>
           <ul>
             <li>每局隨機端出三個容器讓你挑，每種容器自帶一條規則。</li>
-            <li>抽到什麼都得撒下去，你能做的是挑放手的時機、轉一轉方向。盤上亮起來的就是落點，但手一滑還可能彈到隔壁那欄；轉的時候也可能被兔子撞歪——唯一能丟的是貼著劇毒標籤的罐子。</li>
+            <li>零韻的手吊著材料左右擺，盤上亮起來的就是落點。對準格子正中央、落點亮金光時放手＝Perfect，分數加成，連續 Perfect 還會疊連擊；放手偏太多可能滑到隔壁那欄。</li>
+            <li>撒完會自動吊上下一件，擺速也會越來越快。覺得夠了隨時收手送餐（手上吊著的那件會放回去）。轉方向時可能被兔子撞歪——唯一能丟的是貼著劇毒標籤的罐子。</li>
             <li>材料會往下掉、一層層堆起來。盤子只有四層，堆過盤緣就整盤打翻；覺得夠了就收手送餐。</li>
             <li>分數就是色香味星數 × 占的格數。每局零韻的要求不一樣，可能是總分，也可能指定「香要夠」。</li>
             <li>每樣材料品質隨機：R 占 1 格、SR 占 2 格、SSR 占 3 格（L 形）、UR 占 4 格。品質越高星越多，也越佔位置。</li>
