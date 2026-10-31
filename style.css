@@ -240,6 +240,17 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 .float-txt.miss { font-size: 15px; color: #ec8f8f; }
 .float-txt.pts { font-family: var(--serif-en); font-size: 17px; color: var(--gold); }
 .float-txt.pts.neg { color: #ec8f8f; }
+/* 打擊感：碎屑、Perfect 光環、連擊牌 */
+.spark { position: fixed; border-radius: 50%; pointer-events: none; }
+.ring { position: fixed; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 0 18px rgba(232,134,47,.7), inset 0 0 12px rgba(232,134,47,.5); pointer-events: none; }
+.combo-badge { position: absolute; right: 2px; top: 2px; z-index: 6; display: flex; flex-direction: column; align-items: flex-end; line-height: 1; pointer-events: none; font-family: var(--serif-en); color: var(--gold); transform-origin: 100% 0; }
+.combo-badge small { font-size: 11px; letter-spacing: .25em; color: var(--cream-dim); background: var(--navy-light); padding: 0 2px 0 6px; }
+.combo-badge b { font-size: 30px; font-weight: 600; text-shadow: 0 2px 0 var(--navy), 0 0 12px rgba(232,134,47,.5); }
+.combo-badge.lv3 b { font-size: 34px; }
+.combo-badge.lv4 b { font-size: 39px; color: #f09a48; text-shadow: 0 2px 0 var(--navy), 0 0 18px rgba(232,134,47,.8); }
+.combo-badge.lv5 b { font-size: 44px; color: #ffd08a; text-shadow: 0 2px 0 var(--navy), 0 0 24px rgba(232,134,47,1); }
+.combo-badge.broken { font-size: 14px; letter-spacing: .12em; color: #ec8f8f; font-family: inherit; font-weight: 700; }
+.est-value { display: inline-block; transform-origin: 100% 50%; }
 .cell.ghost.bad { background: repeating-linear-gradient(135deg, rgba(194,59,59,.45) 0 7px, rgba(194,59,59,.12) 7px 14px); border-color: var(--brick); }
 .rabbit { position: absolute; left: 0; bottom: 0; width: 50px; z-index: 3; pointer-events: none; }
 .rabbit svg { display: block; width: 100%; height: auto; }
@@ -444,7 +455,8 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 .c-en { font-family: var(--serif-en); font-style: italic; letter-spacing: .14em; font-size: 12px; color: var(--gold-dim); }
 .c-title { font-size: 21px; font-weight: 700; letter-spacing: .3em; margin-top: 2px; }
 .c-no { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--warm-gray); margin-top: 4px; font-family: var(--serif-en), var(--serif-zh); letter-spacing: .05em; }
-.c-dish { text-align: center; margin: 12px 0 2px; font-size: 22px; font-weight: 700; letter-spacing: .06em; line-height: 1.35; }
+.c-dish { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: left; margin: 8px 0 0; font-size: 22px; font-weight: 700; letter-spacing: .06em; line-height: 1.35; }
+.c-pixel { width: 80px; height: 80px; flex-shrink: 0; image-rendering: pixelated; margin: -12px -6px -12px -10px; }
 .c-cont { text-align: center; font-size: 12px; color: var(--warm-gray); margin-bottom: 8px; }
 .c-list { font-size: 12.5px; line-height: 1.55; column-gap: 22px; }
 .c-list.two { columns: 2; font-size: 11.5px; }

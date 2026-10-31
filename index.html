@@ -57,7 +57,7 @@
             <li>點盤上的材料可以看詳情；抽過的材料會記在食材圖鑑裡（存在這個瀏覽器）。</li>
             <li>掀盤、打翻或即死扣一格血，血條歸零⋯⋯後果自負。</li>
             <li>有些材料湊在一起會發生事情。典故就是提示。</li>
-            <li>快捷鍵：空白鍵撒下去（滑鼠也可以直接點盤子）、R 或 ↑ 旋轉、Enter 送餐（按鈕要長按）、T 切換透明背景（OBS 用）。</li>
+            <li>快捷鍵：空白鍵撒下去（滑鼠也可以直接點盤子）、R 或 ↑ 旋轉、Enter 送餐（按鈕要長按）、M 開關音效、T 切換透明背景（OBS 用）。</li>
           </ul>
         </details>
         <div class="album" id="album"></div>
@@ -87,6 +87,7 @@
           <div class="well" id="well">
             <div class="dropper" id="dropper"><div class="track"><div class="hand idle" id="hand"></div></div></div>
             <div class="plate" id="plate"></div>
+            <div class="combo-badge" id="comboBadge" hidden></div>
           </div>
           <div class="side">
             <div class="tray" id="tray">
@@ -136,6 +137,7 @@
     <span>月上零韻 · 2026 Halloween</span>
     <span class="foot-btns">
       <button class="linkbtn" id="btnDex">食材圖鑑</button>
+      <button class="linkbtn" id="btnSound">音效：開</button>
       <button class="linkbtn" id="btnObs">透明背景</button>
     </span>
   </footer>

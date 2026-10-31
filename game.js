@@ -137,6 +137,141 @@
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 無痕模式 */ } }
   };
+
+  // ── 音效：全部用 Web Audio 現場合成，不載音檔（沒有授權問題，檔案也不會變大） ──
+  // 音高走小調五聲音階，連擊越高 Perfect 的鈴聲越高
+  const SOUND_KEY = "rein-halloween-sound";
+  const SFX = (() => {
+    let ctx = null, master = null, noiseBuf = null, on = store.get(SOUND_KEY, true);
+    function ac() {
+      if (!ctx) {
+        const A = window.AudioContext || window.webkitAudioContext;
+        if (!A) return null;
+        ctx = new A();
+        master = ctx.createGain(); master.gain.value = .55; master.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (ctx.state === "suspended") ctx.resume();
+      return ctx;
+    }
+    // 一個音：波形、起訖頻率、起音與衰減
+    function tone({ type = "sine", f, f2, t = 0, dur = .2, vol = .3, attack = .005 }) {
+      const c = ac(); if (!c) return;
+      const t0 = c.currentTime + t, o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t0);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+      g.gain.setValueAtTime(.0001, t0);
+      g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+      g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+      o.connect(g).connect(master); o.start(t0); o.stop(t0 + dur + .05);
+    }
+    // 一段濾過的雜訊：碰撞、碎裂、風切
+    function noise({ t = 0, dur = .15, vol = .3, type = "lowpass", f = 800, f2, q = 1 }) {
+      const c = ac(); if (!c) return;
+      const t0 = c.currentTime + t, s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
+      s.buffer = noiseBuf; fl.type = type; fl.Q.value = q; fl.frequency.setValueAtTime(f, t0);
+      if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+      g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+      s.connect(fl).connect(g).connect(master); s.start(t0, Math.random() * .5); s.stop(t0 + dur + .05);
+    }
+    const PENTA = [0, 3, 5, 7, 10, 12, 15, 17, 19, 22, 24, 27];
+    const note = n => 440 * Math.pow(2, PENTA[Math.max(0, Math.min(n, PENTA.length - 1))] / 12);
+    const SOUNDS = {
+      press: () => tone({ type: "square", f: 1500, f2: 800, dur: .035, vol: .045 }),
+      hang: () => { tone({ type: "triangle", f: 2400, dur: .06, vol: .05 }); tone({ type: "triangle", f: 3100, t: .05, dur: .05, vol: .035 }); },
+      land: n => { const k = Math.min(n, 4); tone({ f: 160 - k * 20, f2: 42, dur: .16 + k * .05, vol: .55 }); noise({ dur: .07 + k * .03, vol: .16 + k * .05, f: 1000 - k * 150 }); },
+      perfect: combo => { const f = note(combo + 2); tone({ type: "triangle", f, dur: .55, vol: .2 }); tone({ f: f * 2, dur: .35, vol: .07 }); tone({ type: "triangle", f, t: .14, dur: .45, vol: .06 }); },
+      good: () => tone({ type: "triangle", f: note(0), dur: .22, vol: .12 }),
+      miss: () => { tone({ type: "triangle", f: 300, f2: 110, dur: .32, vol: .14 }); noise({ dur: .12, vol: .08, f: 500 }); },
+      fuse: () => [0, 2, 4].forEach((n, i) => tone({ type: "triangle", f: note(n + 3), t: i * .07, dur: .32, vol: .13 })),
+      complete: () => { [0, 2, 4, 5, 7].forEach((n, i) => tone({ type: "triangle", f: note(n + 2), t: i * .08, dur: .55, vol: .14 })); tone({ f: note(0) / 2, t: .4, dur: 1.1, vol: .16 }); },
+      scatter: () => { noise({ dur: .32, vol: .32, type: "highpass", f: 1500 }); noise({ t: .04, dur: .3, vol: .2, type: "bandpass", f: 3200, f2: 500, q: 3 }); tone({ type: "square", f: 150, f2: 55, dur: .22, vol: .05 }); },
+      spin: () => noise({ dur: .32, vol: .2, type: "bandpass", f: 350, f2: 2600, q: 4 }),
+      boing: () => { tone({ f: 160, f2: 480, dur: .14, vol: .2 }); tone({ f: 480, f2: 220, t: .13, dur: .2, vol: .14 }); },
+      lever: () => { [0, .05, .1].forEach(t => noise({ t, dur: .03, vol: .22, type: "bandpass", f: 2200, q: 6 })); tone({ f: 120, f2: 55, t: .14, dur: .2, vol: .45 }); },
+      treat: () => [0, 4, 7, 12].forEach((s, i) => tone({ type: "triangle", f: 523.25 * Math.pow(2, s / 12), t: i * .1, dur: .7, vol: .13 })),
+      trick: () => { [0, -1, -6].forEach((s, i) => tone({ type: "triangle", f: 392 * Math.pow(2, s / 12), t: i * .28, dur: .5, vol: .15 })); tone({ f: 98, t: .56, dur: 1.2, vol: .2 }); },
+      fatal: () => { noise({ dur: .7, vol: .5, f: 700, f2: 70 }); tone({ f: 85, f2: 30, dur: .9, vol: .5 }); }
+    };
+    return {
+      play(k, ...a) { if (!on || S.sim) return; try { SOUNDS[k](...a); } catch (e) { /* 舊瀏覽器沒有 Web Audio */ } },
+      unlock() { if (on) ac(); },
+      get on() { return on; },
+      toggle() { on = !on; store.set(SOUND_KEY, on); if (on) { ac(); SOUNDS.press(); } return on; }
+    };
+  })();
+
+  // ── 打擊感：震盤、碎屑、連擊牌 ──
+  function shake(el, px) {
+    if (S.sim || REDUCED || !el) return;
+    const k = [1, -.75, .5, -.28, .12, 0];
+    el.animate(k.map((m, i) => ({ transform: `translate(${m * px * (i % 2 ? .35 : -.35)}px, ${m * px}px)` })), { duration: 220 + px * 10, easing: "linear" });
+  }
+  // 從某個矩形噴出小碎屑；up＝往上噴的力道
+  function burst(r, { n = 8, color = "#d8cdb8", spread = 50, up = 22, size = 5, dur = 520, from = "bottom" } = {}) {
+    if (S.sim || REDUCED || !r) return;
+    const ov = $("#overlay");
+    for (let i = 0; i < n; i++) {
+      const x = r.left + Math.random() * r.width, y = from === "bottom" ? r.bottom - 3 : r.top + Math.random() * r.height;
+      const p = h("div", { class: "spark", style: `left:${x}px;top:${y}px;width:${size}px;height:${size}px;background:${color};` });
+      ov.append(p);
+      const dx = (Math.random() - .5) * spread * 2, dy = -up * (.4 + Math.random());
+      p.animate([{ transform: "translate(-50%, -50%) scale(1)", opacity: 1 }, { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.2)`, opacity: 0 }],
+        { duration: dur * (.7 + Math.random() * .6), easing: "cubic-bezier(.2,.7,.4,1)", fill: "forwards" }).finished.then(() => p.remove(), () => p.remove());
+    }
+  }
+  // 落地那一下：按大小震盤、噴灰；Perfect 再閃光加一圈光環
+  function impact(x, q) {
+    if (S.sim) return;
+    const parts = pieceEls(x.uid), el = anchorEl(x.uid);
+    const r = el && el.getBoundingClientRect();
+    shake($("#plate"), 3 + x.cells.length * 1.6 + (q === "perfect" ? 3 : 0));
+    burst(r, { n: 6 + x.cells.length * 3, spread: 30 + x.cells.length * 12 });
+    if (q !== "perfect" || !r || REDUCED) return;
+    parts.forEach(p => p.animate([{ filter: "brightness(2.2)", transform: "scale(1.1)" }, { filter: "none", transform: "none" }], { duration: 300, easing: "ease-out" }));
+    burst(r, { n: 10, color: "#e8862f", spread: 70, up: 40, size: 6, dur: 650 });
+    const d = Math.max(r.width, r.height);
+    const ring = h("div", { class: "ring", style: `left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;width:${d}px;height:${d}px;` });
+    $("#overlay").append(ring);
+    ring.animate([{ transform: "translate(-50%, -50%) scale(.6)", opacity: .9 }, { transform: "translate(-50%, -50%) scale(1.7)", opacity: 0 }], { duration: 480, easing: "ease-out", fill: "forwards" }).finished.then(() => ring.remove(), () => ring.remove());
+  }
+  // 連擊牌：連擊 2 以上掛在盤子右上角，越高越大越亮；斷掉時掉下去
+  function comboBadge(prev) {
+    if (S.sim) return;
+    const b = $("#comboBadge");
+    b.getAnimations().forEach(a => a.cancel());
+    if (S.combo > 1) {
+      b.hidden = false; b.textContent = "";
+      b.className = "combo-badge lv" + Math.min(S.combo, 5);
+      b.append(h("small", {}, "COMBO"), h("b", {}, "×" + S.combo));
+      b.animate([{ transform: "scale(1.7) rotate(-8deg)", opacity: .3 }, { transform: "scale(.92)", offset: .6 }, { transform: "none", opacity: 1 }], { duration: 340, easing: "ease-out" });
+    } else if (prev > 1) {
+      b.hidden = false; b.textContent = "連擊中斷"; b.className = "combo-badge broken";
+      b.animate([{ opacity: 1, transform: "none" }, { opacity: 1, transform: "none", offset: .4 }, { opacity: 0, transform: "translateY(18px) rotate(10deg)" }], { duration: 1100, fill: "forwards" })
+        .finished.then(() => { if (S.combo <= 1) b.hidden = true; }, () => {});
+    } else b.hidden = true;
+  }
+  // 分數滾動：變多跳一下，變少閃紅
+  let shownScore = 0;
+  function showScore(est) {
+    const el = $("#estimate"), to = est.total, suf = est.unknown ? "＋？" : "";
+    if (to === shownScore || REDUCED) { shownScore = to; el.textContent = to + suf; return; }
+    const from = shownScore, t0 = performance.now();
+    shownScore = to;
+    el.getAnimations().forEach(a => a.cancel());
+    el.animate(to > from
+      ? [{ transform: "scale(1.45)", color: "#ffe2a0" }, { transform: "none" }]
+      : [{ transform: "translateX(-4px)", color: "#ec8f8f" }, { transform: "translateX(3px)", offset: .3 }, { transform: "none" }], { duration: 420, easing: "ease-out" });
+    const step = now => {
+      if (shownScore !== to) return;
+      const k = Math.min(1, (now - t0) / 450);
+      el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))) + suf;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
   function starsEl(n, max = 3) {
     const full = Math.max(0, Math.min(max, Math.round(n)));
     return h("span", { class: "stars" }, "★".repeat(full), h("span", { class: "dim" }, "☆".repeat(max - full)));
@@ -733,6 +868,7 @@
     track.append(rb);
     await rb.animate([{ transform: `translateX(${start}px)${face}` }, { transform: `translateX(${hit}px)${face}` }], { duration: 420, easing: "cubic-bezier(.4,0,.9,.7)", fill: "forwards" }).finished.catch(() => {});
     const tilt = fromRight ? -1 : 1;
+    SFX.play("boing");
     hand.animate([{ transform: "none" }, { transform: `rotate(${22 * tilt}deg)`, offset: .2 }, { transform: `rotate(${-12 * tilt}deg)`, offset: .5 }, { transform: `rotate(${5 * tilt}deg)`, offset: .75 }, { transform: "none" }], { duration: 620, easing: "ease-out" });
     await rb.animate([{ transform: `translateX(${hit}px)${face}` }, { transform: `translate(${hit - 18 * tilt}px, -16px)${face} rotate(-14deg)`, offset: .25 }, { transform: `translate(${hit - 30 * tilt}px, 0)${face}`, offset: .45 }, { transform: `translateX(${end}px)${face}` }], { duration: 700, easing: "ease-in", fill: "forwards" }).finished.catch(() => {});
     rb.remove();
@@ -774,7 +910,7 @@
 
     // 分數、要求與色香味
     const est = estimate();
-    $("#estimate").textContent = est.total + (est.unknown ? "＋？" : "");
+    showScore(est);
     const rl = $("#reqLine"); rl.textContent = "";
     if (S.req) rl.append(h("span", { class: "req" }, "要求 ", h("b", { class: est.total >= S.req.total ? "ok" : "" }, S.req.total), " 分"));
     const dish = $("#dish"); dish.textContent = "";
@@ -811,7 +947,7 @@
         const p = Math.min(1, (now - t0) / LEVER_MS);
         set(p);
         if (p < 1) { raf = requestAnimationFrame(step); return; }
-        done = true; stop(); buzz(40); onServe();
+        done = true; stop(); buzz(40); SFX.play("lever"); onServe();
       };
       raf = requestAnimationFrame(step);
     });
@@ -1047,6 +1183,7 @@
     if (S.busy || S.hand || topFull() || !S.deck.length) return;
     S.turn++;
     const x = drawItem();
+    SFX.play("hang");
     S.hand = x;
     log(`抽到「${x.rar.id} ${displayName(x)}${x.juiced ? "（打成果汁）" : ""}」。零韻的手開始晃了。`);
     if (x.ing.rule === "fake_label") say("那、那個罐子寫著劇毒⋯⋯", "scared");
@@ -1070,6 +1207,7 @@
     if (S.busy || !S.hand) return;
     S.busy = true;
     const x = S.hand, w = shapeW(x.shape);
+    const prevCombo = S.combo;
     const aim = handAim(w), { q, col } = release(x, aim);
     $("#hand").classList.add("held");
     const held = $("#hand .hand-piece .piece");
@@ -1084,6 +1222,10 @@
     await sleep(landed ? dropMs(landed.getBoundingClientRect().top - $("#dropper").getBoundingClientRect().top) + 40 : 420);
     // 落地當下就跳判定
     buzz(q === "perfect" ? [18, 40, 28] : x.cells.length >= 3 ? 34 : 20);
+    SFX.play("land", x.cells.length || 1);
+    if (q === "perfect") SFX.play("perfect", S.combo); else if (q === "good") SFX.play("good"); else SFX.play("miss");
+    if (x.cells.length) impact(x, q);
+    comboBadge(prevCombo);
     const spot = landed ? anchorEl(x.uid) : null;
     if (q === "perfect") floatAt(spot, S.combo > 1 ? `Perfect ×${S.combo}` : "Perfect!", "perfect");
     else if (q === "good") floatAt(spot, "Good", "good");
@@ -1145,6 +1287,7 @@
       return el.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${t.left - rect.left}px, ${t.top - rect.top}px) scale(.3)`, opacity: .2 }],
         { duration: 650, easing: "cubic-bezier(.5,0,.3,1)", fill: "forwards" }).finished.then(() => el.remove(), () => el.remove());
     }));
+    SFX.play(fu.completed.length ? "complete" : "fuse");
     if (fu.completed.length) await popText(fu.completed[0].combo.result + "！", true);
     else if (fu.fused.length) await popText("合體！");
     else await sleep(300);
@@ -1159,7 +1302,10 @@
       const wx = wuxingStep();
       if (!wx.gone.length && !wx.turned.length) break;
       const ov = $("#overlay"), anims = [];
+      if (wx.gone.length) { SFX.play("scatter"); shake($("#plate"), 9); }
+      else if (wx.turned.some(t => t.spun)) SFX.play("spin");
       for (const { y } of wx.gone) for (const gh of ghosts.filter(g => g.uid === y.uid)) {
+        burst(gh.rect, { n: 9, color: "#ec8f8f", spread: 70, up: 34, size: 6, from: "center" });
         const el = gh.el.cloneNode(true), r = gh.rect, dir = Math.random() < .5 ? -1 : 1;
         el.style.cssText += `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0;z-index:55;`;
         ov.append(el);
@@ -1404,12 +1550,14 @@
     if (treat && !pizza) {
       const gain = (C.grades.affection || {})[grade] || 1;
       hearts(grade === "legend" ? 70 : grade === "great" ? 45 : 26);
+      SFX.play("treat");
       S.aff = Math.min(C.maxAffection, S.aff + gain);
       if (S.aff === C.maxAffection && !S.flags.affNoted) { S.flags.affNoted = true; add(FALLBACK.affectionFull); chips.push("好感度滿值"); }
     } else if (!treat && !fatal) {
       const n = 1 + Math.floor(Math.random() * D.tricks.length);
       trick = D.tricks.find(t => t.id === n) || { id: n, text: "", anim: "" };
       say(lines[0] || "", face);
+      SFX.play("trick");
       await sleep(700);
       await playTrick(trick);
     }
@@ -1481,6 +1629,7 @@
     setFace(res.type === "flip" ? "angry" : res.type === "fire_rat_ignite" || res.type === "spill" ? "scared" : "dizzy");
     if (res.cause) say(`「${displayName(res.cause)}」——`);
     await sleep(300);
+    SFX.play("fatal");
     plate.classList.add(res.type === "spill" ? "spilled" : "flipped");
     document.querySelectorAll("#plate .piece").forEach(t => {
       t.style.transform = `translate(${(Math.random() - .5) * 500}px, ${-200 - Math.random() * 300}px) rotate(${(Math.random() - .5) * 720}deg)`;
@@ -1730,6 +1879,8 @@
     S.deck = D.ingredients.slice(); S.penalty = 0; S.turn = 0; S.busy = false;
     S.flags = { affNoted: S.flags.affNoted };
     S.combo = 0;
+    shownScore = 0;
+    if (!S.sim) $("#comboBadge").hidden = true;
   }
   function toContainers() {
     if (S.hp <= 0) { S.hp = C.maxHp; S.aff = 0; S.flags.affNoted = false; }
@@ -1778,6 +1929,104 @@
     else if (L.grade === "legend") n = `傳說的${n}`;
     return n;
   }
+  // ── 證書上的像素料理圖：程式自己畫的 16×16 點陣，不用外部素材 ──
+  // 每列會自動置中；字母對應下面的色票（同一套紫黑＋南瓜橘）
+  const PIX_PAL = { l: "#f8ddb4", k: "#16111f", o: "#e8862f", d: "#b8672a", y: "#f4b46a", b: "#6b3f22", c: "#fffaf0", p: "#3b2d55", g: "#a89cb0" };
+  const PIX_DISHES = {
+    pumpkin: ["kk", "bk", "..kkkbbkkk..", ".kyodoodook.", "kyoodoodoook", "kokkoddokkok", "kookoddokook",
+      "kooooddooook", "kokkkkkkkkok", "kookkookkook", ".koooddoook.", "..kkkkkkkk..", ".gggggggggg."],
+    soup: ["...g...g......", "....g...g.....", "...g...g......", "..............",
+      "kkkkkkkkkkkkkk", "kyoodooooyoodk", "kpcppppppppppk", ".kpcppppppppk.", "..kppppppppk..",
+      "...kkkkkkkk...", "....kppppk....", "...kkkkkkkk..."],
+    pie: ["kk............", "kokk..........", "kooookk.......", "koocooookk....", "kooooooooookk.",
+      "kyyyyyyyyyyddk", "kyyyyyyyyyyddk", "kbbbbbbbbbbbbk", "kkkkkkkkkkkkkk", ".gggggggggggg."],
+    drumstick: [".......kkkk...", ".....kkyoodk..", "....kyooooddk.", "....koooooddk.", "....kooooddk..",
+      "....koodddk...", "...kkdddkk....", "..kcckk.......", ".kcck.........", "kccck.........", ".kkk.........."],
+    cake: [".....yo.....", ".....oo.....", "....kkkk....", "....kcck....", "....kcck....",
+      ".kkkkkkkkkk.", "kooooooooook", "kooodooodook", "kpoppopppopk", "kppppppppppk",
+      "kppppppppppk", "kkkkkkkkkkkk", "gggggggggggg"],
+    tea: ["....g..g......", ".....g..g.....", "....g..g......", "kkkkkkkkkk....", "kooodoooyk....",
+      "kppppppppkkk..", "kpcppppppk.k..", "kpcppppppkkk..", ".kppppppk.....", "..kkkkkk......", "gggggggggggg.."],
+    cauldron: ["....yy...y....", "...y..yy......", "kkkkkkkkkkkkkk", "kooyoodoooyook", ".kkkkkkkkkkkk.",
+      "kpcppppppppppk", "kpcppppppppppk", "kppppppppppppk", ".kppppppppppk.", "..kkkkkkkkkk..",
+      "..k.k....k.k..", "...oyo..oyo..."],
+    ghost: ["....kkkk....", "..kkcccckk..", ".kcccccccck.", "kcccccccccck", "kcckcccckcck", "kcckcccckcck",
+      "kcccccccccck", "kcccckkcccck", "kcccccccccck", "kcccccccccck", "kcckkcckkcck", ".kk..kk..kk."],
+    spilled: ["o.............o.", "..o.........o...", ".....kkkkkk.....", "....kpppcppk....", "...kppppppcpk...",
+      "...kpppppppppk..", "..kkkkkkkkkkkkk.", ".oyooooooooodoo.", "o..oodooodoo..o."]
+  };
+  // 證書料理圖分等級：差很多＝燒焦冒黑煙、差一點＝有點焦、過關＝原樣、大滿足＝閃光、傳說＝金盤加光環
+  // 同一等級也會隨機左右翻、換深淺、閃光換位置，所以每張都不太一樣
+  function pixTier(L) {
+    if (L.fatal) return "fatal";
+    if (L.grade === "legend" || L.grade === "great") return L.grade;
+    if (L.treat) return "good";
+    return L.total / Math.max(1, L.req.total) < .5 ? "burnt" : "singed";
+  }
+  function pixRng(seed) {
+    return () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  // 20×20 格畫成 160px 的 PNG：證書顯示 80px、html2canvas 兩倍截圖時剛好一比一，不會糊
+  function pixelDish(name, tier, seed) {
+    const N = 20, U = 8, rnd = pixRng(seed), rows = PIX_DISHES[name];
+    const m = Array.from({ length: N }, () => Array(N).fill("."));
+    const w = Math.max(...rows.map(r => r.length)), top = Math.floor((N - rows.length + 1) / 2) + 1;
+    rows.forEach((r, y) => {
+      const left = Math.floor((N - w) / 2) + Math.floor((w - r.length) / 2);
+      [...r].forEach((ch, x) => { m[top + y][left + x] = ch; });
+    });
+    if (rnd() < .5) m.forEach(r => r.reverse());
+    const each = f => m.forEach((r, y) => r.forEach((ch, x) => { const v = f(ch, x, y); if (v) r[x] = v; }));
+    const free = (x, y) => x >= 0 && y >= 0 && x < N && y < N && m[y][x] === ".";
+    const put = (x, y, ch) => { if (free(x, y)) m[y][x] = ch; };
+    const sparkle = (x, y, big) => { put(x, y, "c"); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => put(x + dx, y + dy, "y")); if (big) [[2, 0], [-2, 0], [0, 2], [0, -2]].forEach(([dx, dy]) => put(x + dx, y + dy, "o")); };
+    const spots = [[2, 2], [17, 2], [2, 16], [17, 16], [17, 9], [2, 9], [10, 1]].sort(() => rnd() - .5);
+    // 料理最上面那一列，煙和光環從這裡往上畫
+    const crown = m.findIndex(r => r.some(ch => ch !== "."));
+    const xs = m[crown].map((ch, x) => ch !== "." ? x : -1).filter(x => x >= 0);
+    const smoke = (n, col) => {
+      for (let i = 0; i < n; i++) {
+        let x = xs[Math.floor(rnd() * xs.length)] + Math.round(rnd() * 2 - 1);
+        for (let y = crown - 1; y >= Math.max(0, crown - 4); y--) { put(x, y, col); x += rnd() < .5 ? -1 : 1; }
+      }
+    };
+    if (tier === "fatal") {
+      for (let i = 0; i < 4; i++) put(Math.floor(rnd() * N), 12 + Math.floor(rnd() * 6), rnd() < .5 ? "o" : "d");
+    } else if (tier === "burnt") {
+      each(ch => ({ o: "b", y: "d", d: "b", c: "g", p: "k" })[ch]);
+      each(ch => ch === "b" && rnd() < .3 ? "k" : null);
+      smoke(3, "p");
+    } else if (tier === "singed") {
+      each(ch => (ch === "o" || ch === "y") && rnd() < .4 ? (rnd() < .5 ? "d" : "b") : null);
+      smoke(1, "g");
+    } else {
+      // 過關以上：三成機率整盤換深或淺一號
+      const tone = rnd();
+      if (tone < .15) each(ch => ({ o: "y", d: "o" })[ch]);
+      else if (tone < .3) each(ch => ({ o: "d", y: "o" })[ch]);
+      if (tier === "good" && rnd() < .35) sparkle(...spots[0], false);
+      if (tier === "great") { sparkle(...spots[0], true); sparkle(...spots[1], false); if (rnd() < .5) sparkle(...spots[2], false); }
+      if (tier === "legend") {
+        // 傳說：金盤＋背後一圈金色圓光，四角大閃光
+        each(ch => ch === "g" ? "y" : null);
+        [[2, 2], [17, 2], [2, 17], [17, 17]].forEach(([x, y], i) => sparkle(x, y, i % 2 === (rnd() < .5 ? 0 : 1)));
+        each((ch, x, y) => { if (ch !== ".") return null; const d = Math.hypot(x - 9.5, y - 9.5); return d < 8.4 ? "l" : d < 9.4 ? "y" : null; });
+      }
+    }
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = N * U;
+    const g = cv.getContext("2d");
+    m.forEach((r, y) => r.forEach((ch, x) => { if (PIX_PAL[ch]) { g.fillStyle = PIX_PAL[ch]; g.fillRect(x * U, y * U, U, U); } }));
+    return cv.toDataURL("image/png");
+  }
+  // 每局抽一張料理、一個隨機種子；掀盤、打翻這類失敗固定是打翻的碗
+  function certPixel(L) {
+    if (!L.pixel) {
+      const pool = Object.keys(PIX_DISHES).filter(k => k !== "spilled");
+      L.pixel = { name: L.fatal ? "spilled" : pool[Math.floor(Math.random() * pool.length)], seed: Math.floor(Math.random() * 1e9) };
+    }
+    return pixelDish(L.pixel.name, pixTier(L), L.pixel.seed);
+  }
   function buildCert() {
     const L = S.last, el = $("#cert");
     el.textContent = "";
@@ -1820,7 +2069,7 @@
         h("div", { class: "c-en" }, "Certificate of Halloween Culinary Appraisal"),
         h("div", { class: "c-title" }, "萬聖節料理鑑定證書"),
         h("div", { class: "c-no" }, h("span", {}, serial), h("span", {}, "月上零韻圖書館餐廳"), h("span", {}, date))),
-      h("div", { class: "c-dish" }, dishName(L)),
+      h("div", { class: "c-dish" }, h("img", { class: "c-pixel", src: certPixel(L), alt: "" }), h("span", {}, dishName(L))),
       h("div", { class: "c-cont" }, `器：${S.contName}　｜　上盤 ${S.grid.filter(Boolean).length} / ${CELLS} 格`),
       h("div", { class: listCls }, shown),
       h("div", { class: "c-total" },
@@ -1848,8 +2097,7 @@
     modal.hidden = false;
     try {
       if (document.fonts && document.fonts.ready) await document.fonts.ready;
-      const img = $("#cert .c-portrait");
-      if (img && !img.complete) await new Promise(r => { img.onload = img.onerror = r; });
+      for (const img of $("#cert").querySelectorAll("img")) if (!img.complete) await new Promise(r => { img.onload = img.onerror = r; });
       if (typeof html2canvas !== "function") throw new Error("html2canvas 沒載入");
       const canvas = await html2canvas($("#cert"), { scale: 2, backgroundColor: null, logging: false });
       const url = canvas.toDataURL("image/png");
@@ -1912,7 +2160,7 @@
     delete out.ratio;
     return out;
   }
-  if (new URLSearchParams(location.search).has("debug")) window.__rein = { simulate, state: S, playTrick, renderPlate };
+  if (new URLSearchParams(location.search).has("debug")) window.__rein = { simulate, state: S, playTrick, renderPlate, pixelDish };
 
   // ── 綁定 ──
   $("#plate").style.cssText = `grid-template-columns:repeat(${COLS},minmax(0,1fr));grid-template-rows:repeat(${ROWS},minmax(0,1fr));aspect-ratio:${COLS}/${ROWS};`;
@@ -1924,6 +2172,7 @@
     e.preventDefault();
     $("#btnDraw").classList.add("press");
     buzz(10);
+    SFX.play("press");
     domePress();
   });
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) $("#btnDraw").addEventListener(ev, () => $("#btnDraw").classList.remove("press"));
@@ -1943,6 +2192,11 @@
   $("#well").addEventListener("click", e => { if (!COARSE && S.hand && !e.target.closest(".piece")) onDrop(); });
   const toggleObs = () => document.body.classList.toggle("obs");
   $("#btnObs").onclick = toggleObs;
+  const soundLabel = () => { $("#btnSound").textContent = SFX.on ? "音效：開" : "音效：關"; };
+  $("#btnSound").onclick = () => { SFX.toggle(); soundLabel(); };
+  soundLabel();
+  // 手機瀏覽器要等第一次點擊才能出聲
+  document.addEventListener("pointerdown", () => SFX.unlock(), { once: true });
   if (new URLSearchParams(location.search).has("obs")) document.body.classList.add("obs");
   document.addEventListener("keydown", e => {
     if (e.target.closest("input, textarea")) return;
@@ -1952,6 +2206,7 @@
     else if (playing && e.code === "Enter") { e.preventDefault(); onServe(); }
     else if (playing && (e.key === "r" || e.key === "R" || e.key === "ArrowUp")) { e.preventDefault(); onRotate(); }
     else if (e.key === "t" || e.key === "T") toggleObs();
+    else if (e.key === "m" || e.key === "M") { SFX.toggle(); soundLabel(); }
   });
 
   // 預載立繪，換表情不閃
