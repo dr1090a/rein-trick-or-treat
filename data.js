@@ -121,7 +121,7 @@ window.GAME_DATA = {
   combos: [
     { id: "mandrake_safe",    requires: ["mandrake", "macbeth_pack"], effect: "cancel_instadeath", bonus: 0, result: "曼德拉草安全處理", verdict: "" },
     { id: "eternal_oblivion", requires: ["mermaid_flesh", "lethe_water"], effect: "ending", bonus: 12, result: "永生，但忘記一切", verdict: "" },
-    { id: "flying_ointment",  requires: ["belladonna", "henbane", "aconite"], effect: "float", bonus: 8, result: "飛行軟膏完成", verdict: "我看見圖書館在轉" },
+    { id: "flying_ointment",  requires: ["belladonna", "henbane", "aconite"], effect: "float", bonus: 8, result: "飛行軟膏完成", verdict: "零ちゃん看見圖書館在轉" },
     { id: "gleipnir_cake",    requires: ["cat_footsteps", "beard", "mountain_root", "bear_sinew", "fish_breath", "bird_spittle"], effect: "collection", bonus: 30, result: "縛神緞帶蛋糕捲", verdict: "" },
     // requireGenuine：五件都要是真品才成立
     { id: "kaguya_set",       requires: ["buddha_bowl", "hourai_branch", "fire_rat_robe", "dragon_pearl", "swallow_shell"], effect: "collection", bonus: 25, requireGenuine: true, result: "輝夜姬套餐", verdict: "" },
@@ -154,10 +154,10 @@ window.GAME_DATA = {
   ],
 
   tricks: [
-    { id: 1,  anim: "blackout", text: "圖書館停電了。⋯⋯別動，我在你後面。" },
+    { id: 1,  anim: "blackout", text: "圖書館停電了。⋯⋯別動，零ちゃん在你後面。" },
     { id: 2,  anim: "parade",   text: "今晚的客人不只你一個。大家都說——不夠吃。" },
     { id: 3,  anim: "bandage",  text: "打包。這盤連同你一起，退回廚房重做。" },
-    { id: 4,  anim: "cursor",   text: "你的滑鼠，我收下了。想要回去？拿好吃的來換。" },
+    { id: 4,  anim: "cursor",   text: "你的滑鼠，零ちゃん收下了。想要回去？拿好吃的來換。" },
     { id: 5,  anim: "table",    text: "這不是掀盤。這是掀桌。" },
     { id: 6,  anim: "pumpkin",  text: "不好吃的人，要戴南瓜頭反省三分鐘。" },
     { id: 7,  anim: "bats",     text: "蝙蝠們都試吃過了。牠們也說不行。" },

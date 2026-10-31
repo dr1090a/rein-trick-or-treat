@@ -417,6 +417,11 @@ h2 { margin: 0; font-size: 24px; letter-spacing: .05em; }
 }
 .trick-cap b { display: block; font-family: var(--serif-en); font-weight: 600; color: #ec8f8f; letter-spacing: .28em; font-size: 14px; margin-bottom: 2px; }
 .tk-veil { position: absolute; inset: 0; background: rgba(9,6,14,.78); }
+/* jump scare：暗場、衝臉、紅暈、白閃 */
+.tk-hush { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, rgba(6,4,10,.86), #000 70%); opacity: 0; z-index: 2; }
+.tk-scare { position: absolute; left: 50%; top: 50%; height: 230vh; width: auto; max-width: none; transform: translate(-50%,-42%); filter: grayscale(1) contrast(1.75) brightness(.82); z-index: 3; }
+.tk-red { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, transparent 28%, rgba(150,14,14,.7) 78%); z-index: 4; }
+.tk-flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 5; pointer-events: none; }
 .tk-dark { position: absolute; inset: 0; background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), transparent 0 90px, rgba(4,6,10,.985) 135px); }
 .tk-peek { position: absolute; height: 34vh; width: auto; transform: translate(-50%,-50%); filter: drop-shadow(0 0 24px rgba(0,0,0,.8)); }
 .tk-parade { position: absolute; left: 0; bottom: 22vh; display: flex; align-items: flex-end; gap: 34px; padding: 0 40px; }

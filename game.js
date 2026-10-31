@@ -72,24 +72,24 @@
 
   // data.js 的 verdict / text 還沒填時的備用台詞；月月填了就會蓋過去
   const FALLBACK = {
-    treat: "好吃。這盤我收下了。",
+    treat: "好吃。這盤零ちゃん收下了。",
     great: "⋯⋯！超好吃。可以再一盤嗎？",
-    legend: "這是⋯⋯傳說級的料理。今晚的事，零韻會記一輩子。",
+    legend: "這是⋯⋯傳說級的料理。今晚的事，零ちゃん會記一輩子。",
     trick: "⋯⋯不夠。所以，要惡作劇囉。",
     flip: "鑑定：0 分。備註：你知道你做了什麼。",
-    spill: "堆太高了。整盤打翻，地板吃得比我還飽。",
+    spill: "堆太高了。整盤打翻，地板吃得比零ちゃん還飽。",
     double_flip: "聚寶盆把鳳梨也複製了。雙倍火葬。",
-    rampage: "血條歸零。圖書館今天不營業——你給我站住。",
-    instadeath_mandrake: "曼德拉草在盤子上尖叫。零韻聽見了。",
+    rampage: "血條歸零。圖書館今天不營業——你給零ちゃん站住。",
+    instadeath_mandrake: "曼德拉草在盤子上尖叫。零ちゃん聽見了。",
     instadeath_toxic: "瞳孔放大，世界很美。然後就沒有然後了。",
     fire_rat_ignite: "火鼠裘是假的。一燒就著，整盤一起。",
     hawaiian: "⋯⋯今天心情特別好。鳳梨，准了。",
     pizza: "（死魚眼咀嚼）分數給你。心不給。",
     busu_reveal: "標籤寫劇毒，舔起來是砂糖。主人騙人。",
-    eternal_oblivion: "永生了。可是⋯⋯我剛剛吃了什麼？",
+    eternal_oblivion: "永生了。可是⋯⋯零ちゃん剛剛吃了什麼？",
     decor: name => `${name}⋯⋯不能吃。但擺在盤上，滿好看的。`,
     discount: name => `${name}⋯⋯為什麼要放${name}。`,
-    affectionFull: "⋯⋯謝謝你一直餵我。好感度，滿了。",
+    affectionFull: "⋯⋯謝謝你一直餵零ちゃん。好感度，滿了。",
     nibble: n => `（零韻趁你不注意，偷吃了「${n}」。）`,
     shake: n => `盤子晃了一下，「${n}」滾到別的地方去了。`,
     fresh: (n, m) => `「${n}」今天特別新鮮，分數 ×${m}。`,
@@ -192,7 +192,12 @@
       boing: () => { tone({ f: 160, f2: 480, dur: .14, vol: .2 }); tone({ f: 480, f2: 220, t: .13, dur: .2, vol: .14 }); },
       lever: () => { [0, .05, .1].forEach(t => noise({ t, dur: .03, vol: .22, type: "bandpass", f: 2200, q: 6 })); tone({ f: 120, f2: 55, t: .14, dur: .2, vol: .45 }); },
       treat: () => [0, 4, 7, 12].forEach((s, i) => tone({ type: "triangle", f: 523.25 * Math.pow(2, s / 12), t: i * .1, dur: .7, vol: .13 })),
-      trick: () => { [0, -1, -6].forEach((s, i) => tone({ type: "triangle", f: 392 * Math.pow(2, s / 12), t: i * .28, dur: .5, vol: .15 })); tone({ f: 98, t: .56, dur: 1.2, vol: .2 }); },
+      heart: () => { tone({ f: 62, f2: 38, dur: .14, vol: .55 }); tone({ f: 58, f2: 36, t: .2, dur: .16, vol: .4 }); },
+      scare: () => {
+        noise({ dur: 1, vol: .55, type: "bandpass", f: 3400, f2: 700, q: 1.2 });
+        [440, 466, 622, 932].forEach(f => tone({ type: "sawtooth", f, f2: f * .94, dur: .9, vol: .07, attack: .002 }));
+        tone({ f: 78, f2: 28, dur: 1.1, vol: .6, attack: .002 });
+      },
       fatal: () => { noise({ dur: .7, vol: .5, f: 700, f2: 70 }); tone({ f: 85, f2: 30, dur: .9, vol: .5 }); }
     };
     return {
@@ -1557,7 +1562,6 @@
       const n = 1 + Math.floor(Math.random() * D.tricks.length);
       trick = D.tricks.find(t => t.id === n) || { id: n, text: "", anim: "" };
       say(lines[0] || "", face);
-      SFX.play("trick");
       await sleep(700);
       await playTrick(trick);
     }
@@ -1836,13 +1840,36 @@
     }
   };
   const TRICK_ORDER = ["blackout", "parade", "bandage", "cursor", "table", "pumpkin", "bats", "ink", "runes", "upside"];
+  // Trick 前的 jump scare：先暗下來聽心跳（長度隨機，三成直接來），再讓零ちゃん的臉衝到眼前
+  async function jumpScare(st) {
+    const hush = h("div", { class: "tk-hush" });
+    st.append(hush);
+    const wait = Math.random() < .3 ? 0 : 900 + Math.random() * 1400;
+    if (wait) {
+      play(hush, [{ opacity: 0 }, { opacity: 1 }], { duration: wait, easing: "ease-in" });
+      const end = performance.now() + wait;
+      while (end - performance.now() > 250) { SFX.play("heart"); await sleep(Math.min(720, end - performance.now())); }
+    } else hush.style.opacity = 1;
+    const face = h("img", { class: "tk-scare", src: `assets/rein/${Math.random() < .5 ? "deadpan" : "angry"}.webp`, alt: "" });
+    const red = h("div", { class: "tk-red" }), flash = h("div", { class: "tk-flash" });
+    st.append(face, red, flash);
+    SFX.play("scare");
+    buzz([90, 30, 160]);
+    shake(st, 22);
+    play(flash, [{ opacity: .95 }, { opacity: 0 }], { duration: 240, easing: "ease-out" });
+    await play(face, [{ transform: "translate(-50%,-42%) scale(.3)", opacity: .3 }, { transform: "translate(-50%,-42%) scale(1.08)", opacity: 1, offset: .4 }, { transform: "translate(-50%,-42%) scale(1)", opacity: 1 }], { duration: 340, easing: "cubic-bezier(.1,.9,.2,1)" });
+    // 停在眼前抖一下，再收掉
+    await play(face, [{ transform: "translate(-50%,-42%) scale(1)" }, { transform: "translate(-51.5%,-41%) scale(1.03)", offset: .2 }, { transform: "translate(-49%,-43%) scale(1)", offset: .4 }, { transform: "translate(-50.5%,-42%) scale(1.02)", offset: .6 }, { transform: "translate(-50%,-42%) scale(1)" }], 650);
+    await Promise.all([play(face, [{ opacity: 1 }, { opacity: 0 }], 280), play(red, [{ opacity: 1 }, { opacity: 0 }], 280), play(hush, [{ opacity: 1 }, { opacity: 0 }], 420)]);
+    [hush, face, red, flash].forEach(e => e.remove());
+  }
   async function playTrick(t) {
     const name = TRICKS[t.anim] ? t.anim : TRICK_ORDER[(t.id - 1) % TRICK_ORDER.length];
     const st = h("div", { class: "trick" });
     document.body.append(st);
     try {
       if (REDUCED) { await trickCaption(st, t, 0); await sleep(2600); }
-      else await TRICKS[name](st, t);
+      else { await jumpScare(st); await TRICKS[name](st, t); }
       await play(st, [{ opacity: 1 }, { opacity: 0 }], 350);
     } finally {
       st.remove();
@@ -2214,6 +2241,6 @@
   requestAnimationFrame(ghostTick);
   renderMeters();
   renderAlbum();
-  say("歡迎光臨。今晚想讓我吃什麼？", "idle");
+  say("歡迎光臨。今晚想讓零ちゃん吃什麼？", "idle");
   show("screen-title");
 })();
